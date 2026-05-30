@@ -1,6 +1,15 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { DEVOPS_TOPICS, getTotalModules } from '@/lib/devops'
+import {
+  DEVOPS_TOPICS,
+  getTotalModules,
+  PLACEMENT_TOPIC_SLUGS,
+  PLACEMENT_TOPIC_LABELS,
+  calculatePlacementScore,
+  placementScoreLabel,
+  placementScoreColor,
+  confidenceBarColor,
+} from '@/lib/devops'
 import { calculateStreak } from '@/lib/utils'
 import Link from 'next/link'
 
@@ -22,18 +31,29 @@ export default async function DevOpsDashboardPage() {
       .order('logged_at', { ascending: false }),
   ])
 
-  const topicMap = new Map((topicRows ?? []).map((r) => [r.topic_slug, r]))
+  const rows = topicRows ?? []
+  const topicMap = new Map(rows.map((r) => [r.topic_slug, r]))
   const streak = calculateStreak((recentLogs ?? []).map((l) => l.logged_at))
   const totalMins = (recentLogs ?? []).reduce((sum, l) => sum + l.duration_minutes, 0)
-  const topicsStarted = (topicRows ?? []).filter((r) => r.completed_modules > 0 || r.confidence > 0).length
-  const totalDone = (topicRows ?? []).reduce((sum, r) => sum + r.completed_modules, 0)
+  const topicsStarted = rows.filter((r) => r.completed_modules > 0 || r.confidence > 0).length
+  const totalDone = rows.reduce((sum, r) => sum + r.completed_modules, 0)
   const totalAll = getTotalModules()
   const overallPct = Math.round((totalDone / totalAll) * 100)
 
+  const placementScore = calculatePlacementScore(rows)
+  const placementLabel = placementScoreLabel(placementScore)
+  const placementColor = placementScoreColor(placementScore)
+
   const featuredTopics = DEVOPS_TOPICS.slice(0, 5)
+
+  // SVG ring for placement score
+  const R = 36
+  const CIRC = 2 * Math.PI * R
+  const dashOffset = CIRC - (CIRC * placementScore) / 100
 
   return (
     <div className="px-4 pt-6 pb-4 max-w-lg mx-auto space-y-5">
+
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
@@ -74,6 +94,88 @@ export default async function DevOpsDashboardPage() {
         </div>
         <p className="text-xs mt-2" style={{ color: 'var(--muted-foreground)' }}>
           {totalDone} of {totalAll} modules done across {DEVOPS_TOPICS.length} topics
+        </p>
+      </div>
+
+      {/* ── Placement Readiness ── */}
+      <div
+        className="rounded-2xl p-5"
+        style={{
+          background: 'linear-gradient(135deg, #16161a 0%, #0f1a2e 100%)',
+          border: `1px solid ${placementColor}35`,
+        }}
+      >
+        {/* Header row */}
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.12em] mb-0.5" style={{ color: 'var(--devops-accent)' }}>
+              Placement Readiness
+            </p>
+            <p className="text-xs" style={{ color: 'var(--muted-foreground)' }}>
+              Based on confidence across 10 core areas
+            </p>
+          </div>
+
+          {/* Score ring */}
+          <div className="flex flex-col items-center flex-shrink-0">
+            <svg width="84" height="84" viewBox="0 0 84 84">
+              <circle cx="42" cy="42" r={R} fill="none" stroke="var(--secondary)" strokeWidth="7" />
+              <circle
+                cx="42" cy="42" r={R}
+                fill="none"
+                stroke={placementColor}
+                strokeWidth="7"
+                strokeLinecap="round"
+                strokeDasharray={CIRC}
+                strokeDashoffset={dashOffset}
+                transform="rotate(-90 42 42)"
+                style={{ transition: 'stroke-dashoffset 0.8s ease' }}
+              />
+              <text x="42" y="47" textAnchor="middle" fontSize="16" fontWeight="800" fill={placementColor} fontFamily="var(--font-geist-sans), system-ui">
+                {placementScore}%
+              </text>
+            </svg>
+            <p className="text-[10px] font-semibold text-center mt-0.5" style={{ color: placementColor }}>
+              {placementLabel}
+            </p>
+          </div>
+        </div>
+
+        {/* 10-topic confidence grid */}
+        <div className="grid grid-cols-2 gap-x-5 gap-y-2.5">
+          {PLACEMENT_TOPIC_SLUGS.map((slug) => {
+            const row = topicMap.get(slug)
+            const conf = row?.confidence ?? 0
+            const confPct = (conf / 5) * 100
+            const barColor = confidenceBarColor(conf)
+            return (
+              <Link key={slug} href={`/devops/topics/${slug}`}>
+                <div className="group">
+                  <div className="flex items-center justify-between mb-1">
+                    <span
+                      className="text-[11px] font-medium group-hover:underline"
+                      style={{ color: conf > 0 ? 'var(--foreground)' : 'var(--muted-foreground)' }}
+                    >
+                      {PLACEMENT_TOPIC_LABELS[slug]}
+                    </span>
+                    <span className="text-[10px] font-bold" style={{ color: barColor }}>
+                      {conf}/5
+                    </span>
+                  </div>
+                  <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--secondary)' }}>
+                    <div
+                      className="h-full rounded-full transition-all"
+                      style={{ width: `${confPct}%`, background: barColor }}
+                    />
+                  </div>
+                </div>
+              </Link>
+            )
+          })}
+        </div>
+
+        <p className="text-[10px] mt-3" style={{ color: 'var(--muted-foreground)' }}>
+          Tap any topic to update your confidence rating.
         </p>
       </div>
 

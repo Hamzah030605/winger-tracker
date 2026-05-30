@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { calculateCurrentWeek, isPreStart, getNextMonday } from '@/lib/utils'
 import { getTodaySessions, GYM_PLAN } from '@/lib/plans'
 import { seedHabitsIfMissing } from '@/lib/habits'
+import { calculatePlacementScore } from '@/lib/devops'
 import { TodaySessionCard } from '@/components/dashboard/today-session-card'
 import { AdvanceWeekButton } from '@/components/dashboard/advance-week-button'
 import { MissionCard } from '@/components/dashboard/mission-card'
@@ -68,8 +69,7 @@ export default async function DashboardPage() {
       .from('devops_topics')
       .select('*')
       .eq('user_id', user.id)
-      .order('updated_at', { ascending: false })
-      .limit(1),
+      .order('updated_at', { ascending: false }),
     supabase
       .from('devops_logs')
       .select('logged_at')
@@ -134,6 +134,7 @@ export default async function DashboardPage() {
   // ── DevOps ────────────────────────────────────────────────────────────────
   const currentDevOpsTopic = (devopsTopics ?? [])[0] ?? null
   const lastDevOpsStudied = (devopsLastLog ?? [])[0]?.logged_at ?? null
+  const placementScore = calculatePlacementScore(devopsTopics ?? [])
 
   // ── UI ────────────────────────────────────────────────────────────────────
   const dateLabel = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
@@ -305,7 +306,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* ── 6. DevOps Focus ── */}
-      <DevOpsWidget topicRow={currentDevOpsTopic} lastStudied={lastDevOpsStudied} />
+      <DevOpsWidget topicRow={currentDevOpsTopic} lastStudied={lastDevOpsStudied} placementScore={placementScore} />
 
       {/* ── 7. Focus Session widget (placeholder until /focus is built) ── */}
       <Link

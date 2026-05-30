@@ -217,3 +217,69 @@ export function getTopicBySlug(slug: string): DevOpsTopic | undefined {
 export function getTotalModules(): number {
   return DEVOPS_TOPICS.reduce((sum, t) => sum + t.totalModules, 0)
 }
+
+// ─── Placement Readiness ──────────────────────────────────────────────────────
+
+export const PLACEMENT_TOPIC_SLUGS = [
+  'linux-fundamentals',
+  'bash-scripting',
+  'git-github',
+  'networking',
+  'docker',
+  'aws-basics',
+  'terraform',
+  'kubernetes',
+  'storage',
+  'python-automation',
+] as const
+
+export type PlacementTopicSlug = (typeof PLACEMENT_TOPIC_SLUGS)[number]
+
+export const PLACEMENT_TOPIC_LABELS: Record<PlacementTopicSlug, string> = {
+  'linux-fundamentals': 'Linux',
+  'bash-scripting':     'Bash',
+  'git-github':         'Git',
+  'networking':         'Networking',
+  'docker':             'Docker',
+  'aws-basics':         'AWS',
+  'terraform':          'Terraform',
+  'kubernetes':         'Kubernetes',
+  'storage':            'Storage',
+  'python-automation':  'Python',
+}
+
+export function placementScoreLabel(score: number): string {
+  if (score >= 85) return 'Placement Ready'
+  if (score >= 70) return 'Strong Candidate'
+  if (score >= 50) return 'Progressing'
+  if (score >= 30) return 'Early Stage'
+  return 'Getting Started'
+}
+
+export function placementScoreColor(score: number): string {
+  if (score >= 70) return '#10b981'
+  if (score >= 50) return '#f59e0b'
+  return '#ef4444'
+}
+
+export function confidenceBarColor(confidence: number): string {
+  if (confidence >= 4) return '#10b981'
+  if (confidence >= 3) return '#f59e0b'
+  if (confidence >= 1) return '#ef4444'
+  return 'var(--secondary)'
+}
+
+/**
+ * Average confidence % across the 10 placement-relevant topics.
+ * Topics with no row in devops_topics count as 0.
+ */
+export function calculatePlacementScore(
+  topicRows: Array<{ topic_slug: string; confidence: number }>
+): number {
+  const topicMap = new Map(topicRows.map((r) => [r.topic_slug, r.confidence]))
+  const total = PLACEMENT_TOPIC_SLUGS.reduce((sum, slug) => {
+    const conf = topicMap.get(slug) ?? 0
+    return sum + (conf / 5) * 100
+  }, 0)
+  return Math.round(total / PLACEMENT_TOPIC_SLUGS.length)
+}
