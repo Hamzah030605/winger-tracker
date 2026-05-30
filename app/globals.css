@@ -1,0 +1,129 @@
+@import "tailwindcss";
+
+/* ─── shadcn/ui compatibility for Tailwind v4 ─── */
+@custom-variant dark (&:is(.dark *));
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+/* ─── Winger Tracker dark-first design tokens ─── */
+:root {
+  --radius: 0.75rem;
+
+  /* Dark theme by default (Strava / TrainHeroic aesthetic) */
+  --background: #0d0d0f;
+  --foreground: #f2f2f5;
+
+  --card: #16161a;
+  --card-foreground: #f2f2f5;
+
+  --popover: #16161a;
+  --popover-foreground: #f2f2f5;
+
+  /* Orange-red accent — performance energy */
+  --primary: #ff4d1c;
+  --primary-foreground: #ffffff;
+
+  --secondary: #1e1e24;
+  --secondary-foreground: #a0a0b0;
+
+  --muted: #1e1e24;
+  --muted-foreground: #6b6b80;
+
+  --accent: #ff4d1c;
+  --accent-foreground: #ffffff;
+
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+
+  --border: #2a2a35;
+  --input: #1e1e24;
+  --ring: #ff4d1c;
+
+  /* Chart colours */
+  --chart-1: #ff4d1c;
+  --chart-2: #f59e0b;
+  --chart-3: #10b981;
+  --chart-4: #6366f1;
+  --chart-5: #ec4899;
+
+  /* App-specific tokens */
+  --gym-accent: #f59e0b;
+  --football-accent: #10b981;
+  --devops-accent: #3b82f6;
+  --streak-gold: #fbbf24;
+}
+
+/* ─── Base styles ─── */
+* {
+  border-color: var(--border);
+}
+
+body {
+  background-color: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  -webkit-tap-highlight-color: transparent;
+  overscroll-behavior: none;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* ─── Mobile touch target helpers ─── */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* ─── Custom scrollbar ─── */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: var(--background);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 2px;
+}
+
+/* ─── Safe area insets for PWA ─── */
+.safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.safe-top {
+  padding-top: env(safe-area-inset-top, 0px);
+}

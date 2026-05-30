@@ -1,0 +1,133 @@
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import { CalendarHeatmap } from '@/components/progress/calendar-heatmap'
+import { WeeklyBarChart } from '@/components/progress/weekly-bar-chart'
+
+export default async function ProgressPage() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const ninetyDaysAgo = new Date()
+  ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 84)
+
+  const { data: logs } = await supabase
+    .from('session_logs')
+    .select('completed_at, plan_type, session_name, week_number')
+    .eq('user_id', user.id)
+    .gte('completed_at', ninetyDaysAgo.toISOString())
+    .order('completed_at', { ascending: true })
+
+  const allLogs = logs ?? []
+
+  // Build weekly stats (last 8 weeks)
+  const weeklyStats: Array<{ label: string; gym: number; football: number }> = []
+  for (let w = 7; w >= 0; w--) {
+    const weekStart = new Date()
+    weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7) - w * 7)
+    weekStart.setHours(0, 0, 0, 0)
+    const weekEnd = new Date(weekStart)
+    weekEnd.setDate(weekEnd.getDate() + 7)
+
+    const weekLogs = allLogs.filter((l) => {
+      const d = new Date(l.completed_at)
+      return d >= weekStart && d < weekEnd
+    })
+
+    const label = weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+    weeklyStats.push({
+      label,
+      gym: weekLogs.filter((l) => l.plan_type === 'gym').length,
+      football: weekLogs.filter((l) => l.plan_type === 'football').length,
+    })
+  }
+
+  const totalGym = allLogs.filter((l) => l.plan_type === 'gym').length
+  const totalFootball = allLogs.filter((l) => l.plan_type === 'football').length
+
+  return (
+    <div className="max-w-lg mx-auto px-4 pt-6 pb-6 space-y-6">
+      {/* Header */}
+      <div>
+        <p className="text-xs font-semibold uppercase tracking-widest mb-1" style={{ color: 'var(--primary)' }}>
+          📊 Progress
+        </p>
+        <h1 className="text-2xl font-bold" style={{ color: 'var(--foreground)' }}>Training History</h1>
+      </div>
+
+      {/* Summary stats */}
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: 'Total sessions', value: allLogs.length, color: 'var(--foreground)' },
+          { label: 'Gym', value: totalGym, color: 'var(--gym-accent)' },
+          { label: 'Football', value: totalFootball, color: 'var(--football-accent)' },
+        ].map((s) => (
+          <div
+            key={s.label}
+            className="rounded-2xl p-4 text-center"
+            style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
+          >
+            <p className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</p>
+            <p className="text-[10px] uppercase tracking-wide mt-1" style={{ color: 'var(--muted-foreground)' }}>
+              {s.label}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {/* Calendar heatmap */}
+      <div>
+        <h2 className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--muted-foreground)' }}>
+          12-Week Calendar
+        </h2>
+        <CalendarHeatmap logs={allLogs.map((l) => ({ date: l.completed_at, type: l.plan_type as 'gym' | 'football' }))} />
+      </div>
+
+      {/* Weekly bar chart */}
+      <div>
+        <h2 className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--muted-foreground)' }}>
+          Sessions Per Week
+        </h2>
+        <WeeklyBarChart weeks={weeklyStats} />
+      </div>
+
+      {/* Recent sessions list */}
+      <div>
+        <h2 className="text-sm font-semibold uppercase tracking-widest mb-3" style={{ color: 'var(--muted-foreground)' }}>
+          Recent Sessions
+        </h2>
+        <div className="space-y-2">
+          {[...allLogs].reverse().slice(0, 15).map((log, i) => (
+            <div
+              key={i}
+              className="rounded-xl px-4 py-3 flex items-center justify-between"
+              style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
+            >
+              <div>
+                <p className="font-medium text-sm" style={{ color: 'var(--foreground)' }}>{log.session_name}</p>
+                <p className="text-xs mt-0.5" style={{ color: 'var(--muted-foreground)' }}>
+                  Wk {log.week_number} ·{' '}
+                  {new Date(log.completed_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                </p>
+              </div>
+              <span
+                className="text-xs font-semibold px-2 py-1 rounded-full"
+                style={{
+                  background: log.plan_type === 'gym' ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)',
+                  color: log.plan_type === 'gym' ? 'var(--gym-accent)' : 'var(--football-accent)',
+                }}
+              >
+                {log.plan_type === 'gym' ? '🏋️' : '⚽'}
+              </span>
+            </div>
+          ))}
+          {allLogs.length === 0 && (
+            <p className="text-center py-8" style={{ color: 'var(--muted-foreground)' }}>
+              No sessions logged yet. Start your first session!
+            </p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
