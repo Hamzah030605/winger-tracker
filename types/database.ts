@@ -117,6 +117,67 @@ export type Database = {
           }
         ]
       }
+      habits: {
+        Row: {
+          id: string
+          user_id: string
+          name: string
+          category: string
+          sort_order: number
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          name: string
+          category: string
+          sort_order?: number
+          is_active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          name?: string
+          category?: string
+          sort_order?: number
+          is_active?: boolean
+          created_at?: string
+        }
+        Relationships: []
+      }
+      habit_logs: {
+        Row: {
+          id: string
+          user_id: string
+          habit_id: string
+          logged_date: string
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          habit_id: string
+          logged_date?: string
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          habit_id?: string
+          logged_date?: string
+          created_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: 'habit_logs_habit_id_fkey'
+            columns: ['habit_id']
+            referencedRelation: 'habits'
+            referencedColumns: ['id']
+          }
+        ]
+      }
       devops_topics: {
         Row: {
           id: string
@@ -220,3 +281,8 @@ export type DevOpsTopicRow = Database['public']['Tables']['devops_topics']['Row'
 export type DevOpsLog = Database['public']['Tables']['devops_logs']['Row']
 export type DevOpsTask = Database['public']['Tables']['devops_tasks']['Row']
 export type InsertDevOpsLog = Database['public']['Tables']['devops_logs']['Insert']
+
+export type Habit = Database['public']['Tables']['habits']['Row']
+export type HabitLog = Database['public']['Tables']['habit_logs']['Row']
+export type InsertHabit = Database['public']['Tables']['habits']['Insert']
+export type InsertHabitLog = Database['public']['Tables']['habit_logs']['Insert']

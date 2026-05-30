@@ -90,13 +90,18 @@ const NAV_ITEMS = [
     ),
   },
   {
-    href: '/progress',
-    label: 'Progress',
+    href: '/habits',
+    label: 'Habits',
     icon: (active: boolean) => (
       <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <circle
+          cx="12" cy="12" r="9"
+          stroke={active ? '#8b5cf6' : 'var(--muted-foreground)'}
+          strokeWidth="2"
+        />
         <path
-          d="M22 12h-4l-3 9L9 3l-3 9H2"
-          stroke={active ? 'var(--primary)' : 'var(--muted-foreground)'}
+          d="M8 12l3 3 5-6"
+          stroke={active ? '#8b5cf6' : 'var(--muted-foreground)'}
           strokeWidth="2"
           strokeLinecap="round"
           strokeLinejoin="round"

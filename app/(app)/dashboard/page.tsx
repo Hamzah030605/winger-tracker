@@ -1,87 +1,169 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { getDayOfWeek, calculateStreak } from '@/lib/utils'
-import { getTodaySessions, GYM_PLAN, FOOTBALL_PLAN } from '@/lib/plans'
+import { getDayOfWeek } from '@/lib/utils'
+import { getTodaySessions, GYM_PLAN } from '@/lib/plans'
+import { seedHabitsIfMissing, CATEGORY_META, type HabitCategory } from '@/lib/habits'
 import { TodaySessionCard } from '@/components/dashboard/today-session-card'
-import { StreakCard } from '@/components/dashboard/streak-card'
-import { WeekProgressRing } from '@/components/dashboard/week-progress-ring'
 import { AdvanceWeekButton } from '@/components/dashboard/advance-week-button'
+import { QuickHabits } from '@/components/dashboard/quick-habits'
+
+function greeting(): string {
+  const h = new Date().getHours()
+  if (h < 12) return 'Good morning'
+  if (h < 17) return 'Good afternoon'
+  return 'Good evening'
+}
 
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const [{ data: profile }, { data: recentLogs }] = await Promise.all([
-    supabase.from('profiles').select('*').eq('user_id', user.id).single(),
-    supabase
-      .from('session_logs')
-      .select('completed_at, plan_type, session_name')
-      .eq('user_id', user.id)
-      .order('completed_at', { ascending: false })
-      .limit(60),
-  ])
+  await seedHabitsIfMissing(supabase, user.id)
+
+  const todayStr = new Date().toLocaleDateString('sv-SE')
+
+  const [{ data: profile }, { data: recentLogs }, { data: habits }, { data: todayLogs }] =
+    await Promise.all([
+      supabase.from('profiles').select('*').eq('user_id', user.id).single(),
+      supabase
+        .from('session_logs')
+        .select('completed_at, plan_type, session_name')
+        .eq('user_id', user.id)
+        .order('completed_at', { ascending: false })
+        .limit(60),
+      supabase
+        .from('habits')
+        .select('*')
+        .eq('user_id', user.id)
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true }),
+      supabase
+        .from('habit_logs')
+        .select('habit_id')
+        .eq('user_id', user.id)
+        .eq('logged_date', todayStr),
+    ])
 
   const currentWeek = profile?.current_week ?? 1
   const today = getDayOfWeek()
   const { gym: gymSession, football: footballSession } = getTodaySessions(today)
-  const streak = calculateStreak((recentLogs ?? []).map((l) => l.completed_at))
 
-  // Count completions this week for each session type
+  // Training this week
   const thisWeekStart = new Date()
   thisWeekStart.setDate(thisWeekStart.getDate() - ((thisWeekStart.getDay() + 6) % 7))
   thisWeekStart.setHours(0, 0, 0, 0)
-
   const thisWeekLogs = (recentLogs ?? []).filter(
     (l) => new Date(l.completed_at) >= thisWeekStart
   )
-  const gymDone = thisWeekLogs.filter((l) => l.plan_type === 'gym').length
-  const footballDone = thisWeekLogs.filter((l) => l.plan_type === 'football').length
+
+  // Habits
+  const activeHabits = habits ?? []
+  const loggedIds = new Set((todayLogs ?? []).map((l) => l.habit_id))
+  const doneCount = activeHabits.filter((h) => loggedIds.has(h.id)).length
+  const totalCount = activeHabits.length
+  const habitPct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0
+
+  // Pick top 5 incomplete habits to show (deen first, then in order)
+  const habitsWithLog = activeHabits.map((h) => ({ ...h, logged_today: loggedIds.has(h.id) }))
+  const incomplete = habitsWithLog.filter((h) => !h.logged_today).slice(0, 4)
+  const quickHabits = incomplete.length > 0
+    ? incomplete
+    : habitsWithLog.slice(0, 4)
 
   const gymPhase = GYM_PLAN.weeklyProgressions.find((p) => {
     const [start, end] = p.weekRange.split('-').map(Number)
     return currentWeek >= start && currentWeek <= end
   })
 
+  const dateLabel = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
+
+  // Habit ring circle
+  const r = 28
+  const circ = 2 * Math.PI * r
+  const dashOffset = circ - (circ * habitPct) / 100
+
   return (
     <div className="px-4 pt-6 pb-4 max-w-lg mx-auto space-y-5">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between">
         <div>
           <p className="text-xs font-medium uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>
-            {today}
+            {greeting()}
           </p>
           <h1 className="text-2xl font-bold mt-0.5" style={{ color: 'var(--foreground)' }}>
-            Week {currentWeek} of {GYM_PLAN.totalWeeks}
+            {profile?.name ?? 'Winger'}
           </h1>
+          <p className="text-xs mt-0.5" style={{ color: 'var(--muted-foreground)' }}>{dateLabel}</p>
           {gymPhase && (
-            <p className="text-xs mt-0.5" style={{ color: 'var(--primary)' }}>
-              {gymPhase.label}
+            <p className="text-xs mt-1 font-medium" style={{ color: 'var(--primary)' }}>
+              Week {currentWeek} · {gymPhase.label}
             </p>
           )}
         </div>
-        <div className="text-right">
-          <StreakCard streak={streak} />
+
+        {/* Habit ring */}
+        <div className="flex flex-col items-center">
+          <svg width="72" height="72" viewBox="0 0 72 72">
+            <circle cx="36" cy="36" r={r} fill="none" stroke="var(--secondary)" strokeWidth="6" />
+            <circle
+              cx="36"
+              cy="36"
+              r={r}
+              fill="none"
+              stroke={habitPct === 100 ? '#10b981' : 'var(--primary)'}
+              strokeWidth="6"
+              strokeLinecap="round"
+              strokeDasharray={circ}
+              strokeDashoffset={dashOffset}
+              transform="rotate(-90 36 36)"
+              style={{ transition: 'stroke-dashoffset 0.5s ease' }}
+            />
+            <text x="36" y="40" textAnchor="middle" fontSize="13" fontWeight="700" fill="var(--foreground)">
+              {habitPct}%
+            </text>
+          </svg>
+          <p className="text-[10px] mt-0.5 font-medium uppercase tracking-wide" style={{ color: 'var(--muted-foreground)' }}>
+            Habits
+          </p>
         </div>
       </div>
 
-      {/* Week progress */}
-      <div className="grid grid-cols-2 gap-3">
-        <WeekProgressRing
-          label="Gym sessions"
-          done={gymDone}
-          total={5}
-          color="var(--gym-accent)"
-        />
-        <WeekProgressRing
-          label="Football sessions"
-          done={footballDone}
-          total={4}
-          color="var(--football-accent)"
-        />
+      {/* Stats row */}
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          { label: 'Habits done', value: doneCount, suffix: `/${totalCount}`, color: habitPct === 100 ? '#10b981' : 'var(--primary)' },
+          { label: 'Sessions wk', value: thisWeekLogs.length, suffix: '', color: 'var(--football-accent)' },
+          { label: 'Programme', value: currentWeek, suffix: `/${GYM_PLAN.totalWeeks}`, color: 'var(--gym-accent)' },
+        ].map((stat) => (
+          <div
+            key={stat.label}
+            className="rounded-xl p-3 text-center"
+            style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
+          >
+            <p className="text-xl font-bold" style={{ color: stat.color }}>
+              {stat.value}
+              <span className="text-sm" style={{ color: 'var(--muted-foreground)' }}>{stat.suffix}</span>
+            </p>
+            <p className="text-[10px] mt-0.5 uppercase tracking-wide" style={{ color: 'var(--muted-foreground)' }}>
+              {stat.label}
+            </p>
+          </div>
+        ))}
       </div>
 
-      {/* Today's sessions */}
+      {/* Quick habits */}
+      {totalCount > 0 && (
+        <QuickHabits
+          habits={quickHabits}
+          todayStr={todayStr}
+          userId={user.id}
+          doneCount={doneCount}
+          totalCount={totalCount}
+        />
+      )}
+
+      {/* Today's training */}
       <div>
         <h2 className="text-sm font-semibold mb-3 uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>
           Today&apos;s Training
@@ -124,28 +206,6 @@ export default async function DashboardPage() {
 
       {/* Advance week */}
       <AdvanceWeekButton currentWeek={currentWeek} maxWeek={GYM_PLAN.totalWeeks} />
-
-      {/* Quick stats */}
-      <div className="grid grid-cols-3 gap-2">
-        {[
-          { label: 'Gym done', value: gymDone, suffix: '/5' },
-          { label: 'Football done', value: footballDone, suffix: '/4' },
-          { label: 'Total sessions', value: (recentLogs ?? []).length, suffix: '' },
-        ].map((stat) => (
-          <div
-            key={stat.label}
-            className="rounded-xl p-3 text-center"
-            style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
-          >
-            <p className="text-xl font-bold" style={{ color: 'var(--foreground)' }}>
-              {stat.value}<span className="text-sm" style={{ color: 'var(--muted-foreground)' }}>{stat.suffix}</span>
-            </p>
-            <p className="text-[10px] mt-0.5 uppercase tracking-wide" style={{ color: 'var(--muted-foreground)' }}>
-              {stat.label}
-            </p>
-          </div>
-        ))}
-      </div>
     </div>
   )
 }
