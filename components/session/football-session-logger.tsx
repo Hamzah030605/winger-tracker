@@ -59,7 +59,10 @@ export function FootballSessionLogger({
     setSaving(true)
     const now = new Date().toISOString()
     const exercises = allDrills
-      .filter((d) => logs[d.id]?.done)
+      .filter((d) => {
+        const log = logs[d.id]
+        return log?.done || !!log?.qualityRating || !!log?.confidenceRating || !!log?.weakFootNotes || !!log?.notes
+      })
       .map((d) => {
         const log = logs[d.id]
         return {

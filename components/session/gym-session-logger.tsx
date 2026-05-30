@@ -68,7 +68,10 @@ export function GymSessionLogger({
     setSaving(true)
     const now = new Date().toISOString()
     const exercises = allExercises
-      .filter((ex) => logs[ex.name]?.done)
+      .filter((ex) => {
+        const log = logs[ex.name]
+        return log?.done || !!log?.weight || !!log?.rpe || !!log?.notes
+      })
       .map((ex) => {
         const log = logs[ex.name]
         return {
