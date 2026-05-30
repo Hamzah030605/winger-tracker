@@ -262,6 +262,39 @@ export type Database = {
         }
         Relationships: []
       }
+      focus_sessions: {
+        Row: {
+          id: string
+          user_id: string
+          session_type: string
+          duration_minutes: number
+          started_at: string
+          completed_at: string | null
+          notes: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          session_type: string
+          duration_minutes?: number
+          started_at: string
+          completed_at?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          session_type?: string
+          duration_minutes?: number
+          started_at?: string
+          completed_at?: string | null
+          notes?: string | null
+          created_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: Record<string, never>
     Functions: {
@@ -291,3 +324,6 @@ export type Habit = Database['public']['Tables']['habits']['Row']
 export type HabitLog = Database['public']['Tables']['habit_logs']['Row']
 export type InsertHabit = Database['public']['Tables']['habits']['Insert']
 export type InsertHabitLog = Database['public']['Tables']['habit_logs']['Insert']
+
+export type FocusSession = Database['public']['Tables']['focus_sessions']['Row']
+export type InsertFocusSession = Database['public']['Tables']['focus_sessions']['Insert']
