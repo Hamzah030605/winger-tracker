@@ -22,10 +22,15 @@ export function NotesEditor({
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setSaving(false); return }
-    await supabase.from('devops_topics').upsert(
+    const { error } = await supabase.from('devops_topics').upsert(
       { user_id: user.id, topic_slug: slug, notes, updated_at: new Date().toISOString() },
       { onConflict: 'user_id,topic_slug' }
     )
+    if (error) {
+      console.error('[notes-editor] upsert failed:', { message: error.message, code: error.code, details: error.details })
+      setSaving(false)
+      return
+    }
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)

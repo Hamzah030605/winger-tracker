@@ -41,21 +41,38 @@ export function DailyChecklist({
       return
     }
 
+    let error: unknown = null
     if (isChecked) {
-      await supabase
+      const { error: err } = await supabase
         .from('devops_tasks')
         .delete()
         .eq('user_id', user.id)
         .eq('task_key', key)
         .eq('task_date', todayStr)
+      if (err) {
+        console.error('[daily-checklist] delete failed:', { message: err.message, code: err.code, details: err.details })
+        error = err
+      }
     } else {
-      await supabase.from('devops_tasks').upsert(
+      const { error: err } = await supabase.from('devops_tasks').upsert(
         { user_id: user.id, task_key: key, task_date: todayStr },
         { onConflict: 'user_id,task_key,task_date' }
       )
+      if (err) {
+        console.error('[daily-checklist] upsert failed:', { message: err.message, code: err.code, details: err.details })
+        error = err
+      }
     }
 
     setPending((prev) => { const n = new Set(prev); n.delete(key); return n })
+    if (error) {
+      setChecked((prev) => {
+        const next = new Set(prev)
+        isChecked ? next.add(key) : next.delete(key)
+        return next
+      })
+      return
+    }
     router.refresh()
   }
 

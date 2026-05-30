@@ -20,15 +20,22 @@ export function ConfidenceRater({
 
   async function rate(n: number) {
     const next = value === n ? 0 : n
+    const prev = value
     setValue(next)
     setSaving(true)
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setSaving(false); return }
-    await supabase.from('devops_topics').upsert(
+    if (!user) { setValue(prev); setSaving(false); return }
+    const { error } = await supabase.from('devops_topics').upsert(
       { user_id: user.id, topic_slug: slug, confidence: next, updated_at: new Date().toISOString() },
       { onConflict: 'user_id,topic_slug' }
     )
+    if (error) {
+      console.error('[confidence-rater] upsert failed:', { message: error.message, code: error.code, details: error.details })
+      setValue(prev)
+      setSaving(false)
+      return
+    }
     setSaving(false)
     router.refresh()
   }

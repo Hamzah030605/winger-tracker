@@ -24,7 +24,7 @@ export default async function TopicDetailPage({
     .select('*')
     .eq('user_id', user.id)
     .eq('topic_slug', slug)
-    .single()
+    .maybeSingle()
 
   const completedModules = row?.completed_modules ?? 0
   const confidence = row?.confidence ?? 0

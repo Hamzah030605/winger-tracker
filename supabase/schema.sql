@@ -206,6 +206,13 @@ $$;
 GRANT EXECUTE ON FUNCTION public.seed_default_habits() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.seed_default_habits() TO anon;
 
+-- ─── unique constraints (required for upsert onConflict) ─────
+ALTER TABLE public.devops_topics
+  ADD CONSTRAINT IF NOT EXISTS devops_topics_user_topic_unique UNIQUE (user_id, topic_slug);
+
+ALTER TABLE public.devops_tasks
+  ADD CONSTRAINT IF NOT EXISTS devops_tasks_user_key_date_unique UNIQUE (user_id, task_key, task_date);
+
 -- ─── table grants ─────────────────────────────────────────────
 -- Supabase enables RLS by default but still requires explicit grants
 -- for the authenticated role to pass through to the RLS policy check.
@@ -215,3 +222,6 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.session_logs   TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.exercise_logs  TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.habits         TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.habit_logs     TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.devops_topics  TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.devops_logs    TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.devops_tasks   TO authenticated;

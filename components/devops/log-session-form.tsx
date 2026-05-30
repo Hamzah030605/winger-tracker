@@ -24,12 +24,18 @@ export function LogSessionForm() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) { setSaving(false); return }
 
-    await supabase.from('devops_logs').insert({
+    const { error } = await supabase.from('devops_logs').insert({
       user_id: user.id,
       topic_slug: topicSlug,
       duration_minutes: mins,
       notes: notes.trim() || null,
     })
+
+    if (error) {
+      console.error('[log-session] insert failed:', { message: error.message, code: error.code, details: error.details })
+      setSaving(false)
+      return
+    }
 
     setDuration('')
     setNotes('')

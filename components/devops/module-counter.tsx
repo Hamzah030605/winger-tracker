@@ -19,15 +19,22 @@ export function ModuleCounter({
 
   async function update(next: number) {
     if (next < 0 || next > totalModules) return
+    const prev = count
     setCount(next)
     setSaving(true)
     const supabase = createClient()
     const { data: { user } } = await supabase.auth.getUser()
-    if (!user) { setSaving(false); return }
-    await supabase.from('devops_topics').upsert(
+    if (!user) { setCount(prev); setSaving(false); return }
+    const { error } = await supabase.from('devops_topics').upsert(
       { user_id: user.id, topic_slug: slug, completed_modules: next, updated_at: new Date().toISOString() },
       { onConflict: 'user_id,topic_slug' }
     )
+    if (error) {
+      console.error('[module-counter] upsert failed:', { message: error.message, code: error.code, details: error.details })
+      setCount(prev)
+      setSaving(false)
+      return
+    }
     setSaving(false)
     router.refresh()
   }
