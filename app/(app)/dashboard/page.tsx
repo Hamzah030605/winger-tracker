@@ -391,6 +391,32 @@ export default async function DashboardPage() {
         </div>
       )}
 
+      {/* ── Weekly Review ── */}
+      <Link
+        href="/review"
+        className="rounded-2xl px-4 py-4 flex items-center justify-between"
+        style={{
+          background: 'linear-gradient(135deg, #16161a 0%, #1e1a2e 100%)',
+          border: '1px solid rgba(139,92,246,0.25)',
+          display: 'flex',
+        }}
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-xl">📝</span>
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.12em]" style={{ color: '#8b5cf6' }}>
+              Weekly Review
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--muted-foreground)' }}>
+              Reflect on your week · Set next focus
+            </p>
+          </div>
+        </div>
+        <span className="text-xs font-semibold px-3 py-1.5 rounded-xl" style={{ background: 'rgba(139,92,246,0.15)', color: '#8b5cf6' }}>
+          Review →
+        </span>
+      </Link>
+
       {/* ── Programme status ── */}
       <AdvanceWeekButton
         currentWeek={currentWeek}
