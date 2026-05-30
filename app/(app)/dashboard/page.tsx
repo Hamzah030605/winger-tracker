@@ -2,10 +2,11 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { getDayOfWeek } from '@/lib/utils'
 import { getTodaySessions, GYM_PLAN } from '@/lib/plans'
-import { seedHabitsIfMissing, CATEGORY_META, type HabitCategory } from '@/lib/habits'
+import { seedHabitsIfMissing } from '@/lib/habits'
 import { TodaySessionCard } from '@/components/dashboard/today-session-card'
 import { AdvanceWeekButton } from '@/components/dashboard/advance-week-button'
-import { QuickHabits } from '@/components/dashboard/quick-habits'
+import { MissionCard } from '@/components/dashboard/mission-card'
+import { DevOpsWidget } from '@/components/dashboard/devops-widget'
 
 function greeting(): string {
   const h = new Date().getHours()
@@ -23,31 +24,43 @@ export default async function DashboardPage() {
 
   const todayStr = new Date().toLocaleDateString('sv-SE')
 
-  const [{ data: profile }, { data: recentLogs }, { data: habits }, { data: todayLogs }] =
-    await Promise.all([
-      supabase.from('profiles').select('*').eq('user_id', user.id).single(),
-      supabase
-        .from('session_logs')
-        .select('completed_at, plan_type, session_name')
-        .eq('user_id', user.id)
-        .order('completed_at', { ascending: false })
-        .limit(60),
-      supabase
-        .from('habits')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('is_active', true)
-        .order('sort_order', { ascending: true }),
-      supabase
-        .from('habit_logs')
-        .select('habit_id')
-        .eq('user_id', user.id)
-        .eq('logged_date', todayStr),
-    ])
+  const [
+    { data: profile },
+    { data: recentLogs },
+    { data: habits },
+    { data: todayLogs },
+    { data: devopsTopics },
+  ] = await Promise.all([
+    supabase.from('profiles').select('*').eq('user_id', user.id).single(),
+    supabase
+      .from('session_logs')
+      .select('completed_at, plan_type, session_name')
+      .eq('user_id', user.id)
+      .order('completed_at', { ascending: false })
+      .limit(60),
+    supabase
+      .from('habits')
+      .select('*')
+      .eq('user_id', user.id)
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true }),
+    supabase
+      .from('habit_logs')
+      .select('habit_id')
+      .eq('user_id', user.id)
+      .eq('logged_date', todayStr),
+    supabase
+      .from('devops_topics')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('updated_at', { ascending: false })
+      .limit(1),
+  ])
 
   const currentWeek = profile?.current_week ?? 1
   const today = getDayOfWeek()
   const { gym: gymSession, football: footballSession } = getTodaySessions(today)
+  const hasFootballToday = !!footballSession
 
   // Training this week
   const thisWeekStart = new Date()
@@ -64,12 +77,7 @@ export default async function DashboardPage() {
   const totalCount = activeHabits.length
   const habitPct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0
 
-  // Pick top 5 incomplete habits to show (deen first, then in order)
   const habitsWithLog = activeHabits.map((h) => ({ ...h, logged_today: loggedIds.has(h.id) }))
-  const incomplete = habitsWithLog.filter((h) => !h.logged_today).slice(0, 4)
-  const quickHabits = incomplete.length > 0
-    ? incomplete
-    : habitsWithLog.slice(0, 4)
 
   const gymPhase = GYM_PLAN.weeklyProgressions.find((p) => {
     const [start, end] = p.weekRange.split('-').map(Number)
@@ -78,106 +86,91 @@ export default async function DashboardPage() {
 
   const dateLabel = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
 
-  // Habit ring circle
-  const r = 28
+  const r = 30
   const circ = 2 * Math.PI * r
   const dashOffset = circ - (circ * habitPct) / 100
+  const ringColor = habitPct === 100 ? '#10b981' : habitPct > 50 ? '#f59e0b' : 'var(--primary)'
+
+  const currentDevOpsTopic = (devopsTopics ?? [])[0] ?? null
 
   return (
-    <div className="px-4 pt-6 pb-4 max-w-lg mx-auto space-y-5">
-      {/* Header */}
-      <div className="flex items-start justify-between">
-        <div>
-          <p className="text-xs font-medium uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>
+    <div className="px-4 pt-5 pb-6 max-w-lg mx-auto space-y-3">
+
+      {/* ── Header ── */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em]" style={{ color: 'var(--muted-foreground)' }}>
             {greeting()}
           </p>
-          <h1 className="text-2xl font-bold mt-0.5" style={{ color: 'var(--foreground)' }}>
+          <h1 className="text-[22px] font-bold leading-tight mt-0.5" style={{ color: 'var(--foreground)' }}>
             {profile?.name ?? 'Winger'}
           </h1>
-          <p className="text-xs mt-0.5" style={{ color: 'var(--muted-foreground)' }}>{dateLabel}</p>
+          <p className="text-[11px] mt-0.5" style={{ color: 'var(--muted-foreground)' }}>{dateLabel}</p>
           {gymPhase && (
-            <p className="text-xs mt-1 font-medium" style={{ color: 'var(--primary)' }}>
+            <p className="text-[11px] mt-1 font-semibold" style={{ color: 'var(--primary)' }}>
               Week {currentWeek} · {gymPhase.label}
             </p>
           )}
         </div>
 
         {/* Habit ring */}
-        <div className="flex flex-col items-center">
-          <svg width="72" height="72" viewBox="0 0 72 72">
-            <circle cx="36" cy="36" r={r} fill="none" stroke="var(--secondary)" strokeWidth="6" />
+        <div className="flex-shrink-0 flex flex-col items-center">
+          <svg width="68" height="68" viewBox="0 0 76 76">
+            <circle cx="38" cy="38" r={r} fill="none" stroke="var(--secondary)" strokeWidth="7" />
             <circle
-              cx="36"
-              cy="36"
-              r={r}
+              cx="38" cy="38" r={r}
               fill="none"
-              stroke={habitPct === 100 ? '#10b981' : 'var(--primary)'}
-              strokeWidth="6"
+              stroke={ringColor}
+              strokeWidth="7"
               strokeLinecap="round"
               strokeDasharray={circ}
               strokeDashoffset={dashOffset}
-              transform="rotate(-90 36 36)"
-              style={{ transition: 'stroke-dashoffset 0.5s ease' }}
+              transform="rotate(-90 38 38)"
+              style={{ transition: 'stroke-dashoffset 0.6s ease, stroke 0.4s ease' }}
             />
-            <text x="36" y="40" textAnchor="middle" fontSize="13" fontWeight="700" fill="var(--foreground)">
+            <text x="38" y="43" textAnchor="middle" fontSize="13" fontWeight="800" fill="var(--foreground)">
               {habitPct}%
             </text>
           </svg>
-          <p className="text-[10px] mt-0.5 font-medium uppercase tracking-wide" style={{ color: 'var(--muted-foreground)' }}>
+          <p className="text-[9px] mt-0.5 font-bold uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>
             Habits
           </p>
         </div>
       </div>
 
-      {/* Stats row */}
-      <div className="grid grid-cols-3 gap-2">
-        {[
-          { label: 'Habits done', value: doneCount, suffix: `/${totalCount}`, color: habitPct === 100 ? '#10b981' : 'var(--primary)' },
-          { label: 'Sessions wk', value: thisWeekLogs.length, suffix: '', color: 'var(--football-accent)' },
-          { label: 'Programme', value: currentWeek, suffix: `/${GYM_PLAN.totalWeeks}`, color: 'var(--gym-accent)' },
-        ].map((stat) => (
-          <div
-            key={stat.label}
-            className="rounded-xl p-3 text-center"
-            style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
-          >
-            <p className="text-xl font-bold" style={{ color: stat.color }}>
-              {stat.value}
-              <span className="text-sm" style={{ color: 'var(--muted-foreground)' }}>{stat.suffix}</span>
-            </p>
-            <p className="text-[10px] mt-0.5 uppercase tracking-wide" style={{ color: 'var(--muted-foreground)' }}>
-              {stat.label}
-            </p>
-          </div>
-        ))}
-      </div>
-
-      {/* Quick habits */}
+      {/* ── Today's Mission ── */}
       {totalCount > 0 && (
-        <QuickHabits
-          habits={quickHabits}
+        <MissionCard
+          habits={habitsWithLog}
           todayStr={todayStr}
           userId={user.id}
-          doneCount={doneCount}
-          totalCount={totalCount}
+          hasFootballToday={hasFootballToday}
         />
       )}
 
-      {/* Today's training */}
+      {/* ── DevOps Focus ── */}
+      <DevOpsWidget topicRow={currentDevOpsTopic} />
+
+      {/* ── Today's Training ── */}
       <div>
-        <h2 className="text-sm font-semibold mb-3 uppercase tracking-widest" style={{ color: 'var(--muted-foreground)' }}>
+        <p className="text-[10px] font-bold uppercase tracking-[0.12em] mb-2 px-0.5" style={{ color: 'var(--muted-foreground)' }}>
           Today&apos;s Training
-        </h2>
+        </p>
         {!gymSession && !footballSession ? (
-          <div className="rounded-2xl p-5 text-center" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
-            <p className="text-lg mb-1">🧘</p>
-            <p className="font-medium" style={{ color: 'var(--foreground)' }}>Rest Day</p>
-            <p className="text-sm mt-1" style={{ color: 'var(--muted-foreground)' }}>
-              Recovery is part of the programme.
-            </p>
+          <div
+            className="rounded-2xl px-4 py-4 flex items-center gap-3"
+            style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
+          >
+            <span className="text-xl">🧘</span>
+            <div>
+              <p className="font-semibold text-sm" style={{ color: 'var(--foreground)' }}>Rest Day</p>
+              <p className="text-xs mt-0.5" style={{ color: 'var(--muted-foreground)' }}>
+                Recovery is part of the programme.
+              </p>
+            </div>
           </div>
         ) : (
-          <div className="space-y-3">
+          <div className="space-y-2">
             {gymSession && (
               <TodaySessionCard
                 session={gymSession}
@@ -204,7 +197,34 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      {/* Advance week */}
+      {/* ── Stats row ── */}
+      <div className="grid grid-cols-3 gap-2">
+        {[
+          { label: 'Habits', value: doneCount, suffix: `/${totalCount}`, color: ringColor },
+          { label: 'Sessions', value: thisWeekLogs.length, suffix: ' this wk', color: 'var(--football-accent)' },
+          { label: 'Programme', value: `Wk ${currentWeek}`, suffix: '', color: 'var(--gym-accent)' },
+        ].map((stat) => (
+          <div
+            key={stat.label}
+            className="rounded-xl p-3 text-center"
+            style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
+          >
+            <p className="text-lg font-bold leading-tight" style={{ color: stat.color }}>
+              {stat.value}
+              {stat.suffix && (
+                <span className="text-[10px] font-medium" style={{ color: 'var(--muted-foreground)' }}>
+                  {stat.suffix}
+                </span>
+              )}
+            </p>
+            <p className="text-[9px] mt-0.5 uppercase tracking-wide font-semibold" style={{ color: 'var(--muted-foreground)' }}>
+              {stat.label}
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {/* ── Advance week (secondary) ── */}
       <AdvanceWeekButton currentWeek={currentWeek} maxWeek={GYM_PLAN.totalWeeks} />
     </div>
   )

@@ -29,28 +29,21 @@ export function HabitChecklist({
   async function toggle(habitId: string) {
     if (pending.has(habitId)) return
     const isChecked = checked.has(habitId)
-
     setChecked((prev) => {
       const next = new Set(prev)
       isChecked ? next.delete(habitId) : next.add(habitId)
       return next
     })
     setPending((prev) => new Set(prev).add(habitId))
-
     const supabase = createClient()
     if (isChecked) {
-      await supabase
-        .from('habit_logs')
-        .delete()
-        .eq('habit_id', habitId)
-        .eq('logged_date', todayStr)
+      await supabase.from('habit_logs').delete().eq('habit_id', habitId).eq('logged_date', todayStr)
     } else {
       await supabase.from('habit_logs').upsert(
         { user_id: userId, habit_id: habitId, logged_date: todayStr },
         { onConflict: 'habit_id,logged_date' }
       )
     }
-
     setPending((prev) => { const n = new Set(prev); n.delete(habitId); return n })
     router.refresh()
   }
@@ -65,15 +58,27 @@ export function HabitChecklist({
   }, {})
 
   return (
-    <div className="space-y-1">
-      {/* Overall progress bar */}
-      <div className="rounded-2xl p-4 mb-4" style={{ background: 'var(--card)', border: '1px solid var(--border)' }}>
+    <div className="space-y-2">
+      {/* Overall progress */}
+      <div
+        className="rounded-2xl px-4 py-3.5"
+        style={{
+          background: pct === 100
+            ? 'linear-gradient(135deg, #052e16 0%, #14532d22 100%)'
+            : 'linear-gradient(135deg, #16161a 0%, #1a1a22 100%)',
+          border: `1px solid ${pct === 100 ? '#16a34a55' : 'var(--border)'}`,
+        }}
+      >
         <div className="flex items-center justify-between mb-2">
-          <p className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>
-            Today&apos;s Habits
-          </p>
-          <span className="text-sm font-bold" style={{ color: pct === 100 ? '#10b981' : 'var(--primary)' }}>
-            {doneCount}/{activeHabits.length}
+          <p className="text-sm font-semibold" style={{ color: 'var(--foreground)' }}>Today&apos;s Habits</p>
+          <span
+            className="text-xs font-bold px-2 py-0.5 rounded-full"
+            style={{
+              background: pct === 100 ? '#16a34a33' : 'rgba(255,77,28,0.15)',
+              color: pct === 100 ? '#4ade80' : 'var(--primary)',
+            }}
+          >
+            {doneCount}/{activeHabits.length} · {pct}%
           </span>
         </div>
         <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--secondary)' }}>
@@ -81,38 +86,65 @@ export function HabitChecklist({
             className="h-full rounded-full transition-all duration-500"
             style={{
               width: `${pct}%`,
-              background: pct === 100 ? '#10b981' : 'var(--primary)',
+              background: pct === 100 ? '#10b981' : pct > 50 ? '#f59e0b' : 'var(--primary)',
             }}
           />
         </div>
         {pct === 100 && (
-          <p className="text-xs mt-2 font-medium" style={{ color: '#10b981' }}>
-            Perfect day. Allah ybarek. 🌟
+          <p className="text-xs mt-2 font-semibold text-center" style={{ color: '#4ade80' }}>
+            Perfect day. Allah ybarek. 🌿
           </p>
         )}
       </div>
 
-      {/* Categories */}
+      {/* Category cards */}
       {CATEGORY_ORDER.map((cat) => {
         const group = grouped[cat] ?? []
         if (group.length === 0) return null
         const meta = CATEGORY_META[cat as HabitCategory]
         const catDone = group.filter((h) => checked.has(h.id)).length
+        const catPct = group.length > 0 ? Math.round((catDone / group.length) * 100) : 0
+        const catComplete = catDone === group.length
 
         return (
-          <div key={cat} className="mb-5">
-            <div className="flex items-center justify-between mb-2 px-1">
+          <div
+            key={cat}
+            className="rounded-2xl overflow-hidden"
+            style={{
+              background: catComplete ? `${meta.color}0d` : 'var(--card)',
+              border: `1px solid ${catComplete ? meta.color + '33' : 'var(--border)'}`,
+            }}
+          >
+            {/* Category header */}
+            <div
+              className="flex items-center justify-between px-4 py-2.5"
+              style={{
+                background: `linear-gradient(90deg, ${meta.color}14 0%, transparent 100%)`,
+                borderBottom: `1px solid ${catComplete ? meta.color + '25' : 'var(--border)'}`,
+              }}
+            >
               <div className="flex items-center gap-2">
-                <span className="text-sm">{meta.emoji}</span>
-                <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: meta.color }}>
+                <span className="text-base">{meta.emoji}</span>
+                <p className="text-[11px] font-bold uppercase tracking-[0.1em]" style={{ color: meta.color }}>
                   {meta.label}
                 </p>
               </div>
-              <span className="text-xs font-medium" style={{ color: 'var(--muted-foreground)' }}>
-                {catDone}/{group.length}
-              </span>
+              <div className="flex items-center gap-2">
+                {/* Mini progress bar */}
+                <div className="w-16 h-1 rounded-full overflow-hidden" style={{ background: 'var(--secondary)' }}>
+                  <div
+                    className="h-full rounded-full transition-all duration-300"
+                    style={{ width: `${catPct}%`, background: meta.color }}
+                  />
+                </div>
+                <span className="text-[10px] font-bold w-8 text-right" style={{ color: catComplete ? meta.color : 'var(--muted-foreground)' }}>
+                  {catPct}%
+                </span>
+              </div>
             </div>
-            <div className="space-y-1.5">
+
+            {/* Habits */}
+            <div className="p-2 space-y-1">
               {group.map((habit) => (
                 <HabitItem
                   key={habit.id}
