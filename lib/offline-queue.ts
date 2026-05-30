@@ -4,6 +4,7 @@ const QUEUE_KEY = 'winger_offline_queue'
 
 export interface QueuedSessionLog {
   localId: string
+  failCount: number
   planType: 'gym' | 'football'
   sessionName: string
   weekNumber: number
@@ -36,11 +37,12 @@ function writeQueue(queue: QueuedSessionLog[]) {
   localStorage.setItem(QUEUE_KEY, JSON.stringify(queue))
 }
 
-export function enqueueSession(log: Omit<QueuedSessionLog, 'localId'>) {
+export function enqueueSession(log: Omit<QueuedSessionLog, 'localId' | 'failCount'>) {
   const queue = readQueue()
   const entry: QueuedSessionLog = {
     ...log,
     localId: `local-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+    failCount: 0,
   }
   queue.push(entry)
   writeQueue(queue)
@@ -51,11 +53,16 @@ export function getQueueLength(): number {
   return readQueue().length
 }
 
+export function clearQueue() {
+  if (typeof window === 'undefined') return
+  localStorage.removeItem(QUEUE_KEY)
+}
+
 export async function flushQueue(
   saveSession: (log: QueuedSessionLog) => Promise<boolean>
-): Promise<number> {
+): Promise<{ synced: number; failed: number }> {
   const queue = readQueue()
-  if (queue.length === 0) return 0
+  if (queue.length === 0) return { synced: 0, failed: 0 }
 
   let synced = 0
   const remaining: QueuedSessionLog[] = []
@@ -65,10 +72,10 @@ export async function flushQueue(
     if (ok) {
       synced++
     } else {
-      remaining.push(item)
+      remaining.push({ ...item, failCount: (item.failCount ?? 0) + 1 })
     }
   }
 
   writeQueue(remaining)
-  return synced
+  return { synced, failed: remaining.length }
 }

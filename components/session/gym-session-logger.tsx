@@ -86,10 +86,18 @@ export function GymSessionLogger({
         .select('id')
         .single()
 
-      if (sessionErr || !sessionLog) throw new Error('db error')
+      if (sessionErr || !sessionLog) {
+        console.error('[gym-logger] session_logs insert failed:', {
+          message: sessionErr?.message,
+          code: sessionErr?.code,
+          details: sessionErr?.details,
+          hint: sessionErr?.hint,
+        })
+        throw sessionErr ?? new Error('session insert returned no data')
+      }
 
       if (exercises.length > 0) {
-        await supabase.from('exercise_logs').insert(
+        const { error: exErr } = await supabase.from('exercise_logs').insert(
           exercises.map((ex) => ({
             session_log_id: sessionLog.id,
             exercise_name: ex.exerciseName,
@@ -100,8 +108,19 @@ export function GymSessionLogger({
             notes: ex.notes ?? null,
           }))
         )
+        if (exErr) {
+          console.error('[gym-logger] exercise_logs insert failed:', {
+            message: exErr.message,
+            code: exErr.code,
+            details: exErr.details,
+            hint: exErr.hint,
+          })
+          // Session was saved — do not throw, just log. Exercises are lost for this attempt.
+        }
       }
-    } catch {
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err)
+      console.error('[gym-logger] save failed, enqueueing offline:', errMsg)
       enqueueSession({
         planType: 'gym',
         sessionName: session.name,
@@ -110,6 +129,8 @@ export function GymSessionLogger({
         overallNotes: overallNotes || undefined,
         exercises,
       })
+    } finally {
+      setSaving(false)
     }
 
     router.push('/dashboard')
