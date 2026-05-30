@@ -49,5 +49,34 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
 
   const session = getFootballSessionById(sessionSlug)
   if (!session) notFound()
-  return <FootballSessionLogger session={session} week={week} userId={user.id} />
+
+  const { data: prevFootballSession } = await supabase
+    .from('session_logs')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('session_name', session.name)
+    .eq('plan_type', 'football')
+    .order('completed_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+
+  type PrevDrillLog = { qualityRating: number | null; confidenceRating: number | null; weakFootNotes: string | null; notes: string | null }
+  const previousDrillLogs: Record<string, PrevDrillLog> = {}
+
+  if (prevFootballSession) {
+    const { data: prevExercises } = await supabase
+      .from('exercise_logs')
+      .select('exercise_name, quality_rating, confidence_rating, weak_foot_notes, notes')
+      .eq('session_log_id', prevFootballSession.id)
+    for (const ex of prevExercises ?? []) {
+      previousDrillLogs[ex.exercise_name] = {
+        qualityRating: ex.quality_rating,
+        confidenceRating: ex.confidence_rating,
+        weakFootNotes: ex.weak_foot_notes,
+        notes: ex.notes,
+      }
+    }
+  }
+
+  return <FootballSessionLogger session={session} week={week} userId={user.id} previousLogs={previousDrillLogs} />
 }

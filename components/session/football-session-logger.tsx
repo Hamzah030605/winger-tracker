@@ -25,24 +25,37 @@ const RATING_LABELS: Record<number, string> = {
   5: 'Elite',
 }
 
+type PrevDrillLog = { qualityRating: number | null; confidenceRating: number | null; weakFootNotes: string | null; notes: string | null }
+
 export function FootballSessionLogger({
   session,
   week,
   userId,
+  previousLogs = {},
 }: {
   session: FootballSession
   week: number
   userId: string
+  previousLogs?: Record<string, PrevDrillLog>
 }) {
   const router = useRouter()
   const allDrills = session.blocks.flatMap((b) => b.drills)
 
   const [logs, setLogs] = useState<Record<string, DrillLog>>(
     Object.fromEntries(
-      allDrills.map((d) => [
-        d.id,
-        { done: false, qualityRating: 0, confidenceRating: 0, weakFootNotes: '', notes: '' },
-      ])
+      allDrills.map((d) => {
+        const prev = previousLogs[d.name]
+        return [
+          d.id,
+          {
+            done: false,
+            qualityRating: prev?.qualityRating ?? 0,
+            confidenceRating: prev?.confidenceRating ?? 0,
+            weakFootNotes: prev?.weakFootNotes ?? '',
+            notes: prev?.notes ?? '',
+          },
+        ]
+      })
     )
   )
   const [overallNotes, setOverallNotes] = useState('')
