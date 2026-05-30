@@ -47,7 +47,7 @@ export function GymSessionLogger({
             reps: prev?.reps != null ? String(prev.reps) : ex.reps,
             weight: prev?.weight != null ? String(prev.weight) : '',
             rpe: prev?.rpe != null ? String(prev.rpe) : '',
-            notes: '',
+            notes: prev?.notes ?? '',
           },
         ]
       })
