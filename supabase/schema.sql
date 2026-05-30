@@ -205,3 +205,13 @@ $$;
 
 GRANT EXECUTE ON FUNCTION public.seed_default_habits() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.seed_default_habits() TO anon;
+
+-- ─── table grants ─────────────────────────────────────────────
+-- Supabase enables RLS by default but still requires explicit grants
+-- for the authenticated role to pass through to the RLS policy check.
+GRANT USAGE ON SCHEMA public TO authenticated, anon;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.profiles       TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.session_logs   TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.exercise_logs  TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.habits         TO authenticated;
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.habit_logs     TO authenticated;

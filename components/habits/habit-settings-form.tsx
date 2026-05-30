@@ -14,8 +14,12 @@ export function HabitSettingsForm({ habits }: { habits: Habit[] }) {
     if (pending.has(habit.id)) return
     setPending((p) => new Set(p).add(habit.id))
     const supabase = createClient()
-    await supabase.from('habits').update({ is_active: !habit.is_active }).eq('id', habit.id)
+    const { error } = await supabase.from('habits').update({ is_active: !habit.is_active }).eq('id', habit.id)
     setPending((p) => { const n = new Set(p); n.delete(habit.id); return n })
+    if (error) {
+      console.error('[habit-settings] update failed:', { message: error.message, code: error.code, details: error.details })
+      return
+    }
     router.refresh()
   }
 

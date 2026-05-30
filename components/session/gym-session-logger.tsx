@@ -71,7 +71,7 @@ export function GymSessionLogger({
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
 
-      if (!user || !navigator.onLine) throw new Error('offline')
+      if (!user) throw new Error('not authenticated')
 
       const { data: sessionLog, error: sessionErr } = await supabase
         .from('session_logs')

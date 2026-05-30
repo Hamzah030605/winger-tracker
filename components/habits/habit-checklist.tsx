@@ -36,15 +36,33 @@ export function HabitChecklist({
     })
     setPending((prev) => new Set(prev).add(habitId))
     const supabase = createClient()
+    let error: unknown = null
     if (isChecked) {
-      await supabase.from('habit_logs').delete().eq('habit_id', habitId).eq('logged_date', todayStr)
+      const { error: err } = await supabase.from('habit_logs').delete().eq('habit_id', habitId).eq('logged_date', todayStr)
+      if (err) {
+        console.error('[habit-checklist] delete failed:', { message: err.message, code: err.code, details: err.details })
+        error = err
+      }
     } else {
-      await supabase.from('habit_logs').upsert(
+      const { error: err } = await supabase.from('habit_logs').upsert(
         { user_id: userId, habit_id: habitId, logged_date: todayStr },
         { onConflict: 'habit_id,logged_date' }
       )
+      if (err) {
+        console.error('[habit-checklist] upsert failed:', { message: err.message, code: err.code, details: err.details })
+        error = err
+      }
     }
     setPending((prev) => { const n = new Set(prev); n.delete(habitId); return n })
+    if (error) {
+      // Revert optimistic update — DB write failed
+      setChecked((prev) => {
+        const next = new Set(prev)
+        isChecked ? next.add(habitId) : next.delete(habitId)
+        return next
+      })
+      return
+    }
     router.refresh()
   }
 

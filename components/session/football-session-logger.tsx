@@ -74,7 +74,7 @@ export function FootballSessionLogger({
     try {
       const supabase = createClient()
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user || !navigator.onLine) throw new Error('offline')
+      if (!user) throw new Error('not authenticated')
 
       const { data: sessionLog, error: sessionErr } = await supabase
         .from('session_logs')
@@ -89,10 +89,18 @@ export function FootballSessionLogger({
         .select('id')
         .single()
 
-      if (sessionErr || !sessionLog) throw new Error('db error')
+      if (sessionErr || !sessionLog) {
+        console.error('[football-logger] session_logs insert failed:', {
+          message: sessionErr?.message,
+          code: sessionErr?.code,
+          details: sessionErr?.details,
+          hint: sessionErr?.hint,
+        })
+        throw sessionErr ?? new Error('session insert returned no data')
+      }
 
       if (exercises.length > 0) {
-        await supabase.from('exercise_logs').insert(
+        const { error: exErr } = await supabase.from('exercise_logs').insert(
           exercises.map((ex) => ({
             session_log_id: sessionLog.id,
             exercise_name: ex.exerciseName,
@@ -102,8 +110,18 @@ export function FootballSessionLogger({
             notes: ex.notes ?? null,
           }))
         )
+        if (exErr) {
+          console.error('[football-logger] exercise_logs insert failed:', {
+            message: exErr.message,
+            code: exErr.code,
+            details: exErr.details,
+            hint: exErr.hint,
+          })
+        }
       }
-    } catch {
+    } catch (err) {
+      const errMsg = err instanceof Error ? err.message : String(err)
+      console.error('[football-logger] save failed, enqueueing offline:', errMsg)
       enqueueSession({
         planType: 'football',
         sessionName: session.name,
@@ -112,6 +130,8 @@ export function FootballSessionLogger({
         overallNotes: overallNotes || undefined,
         exercises,
       })
+    } finally {
+      setSaving(false)
     }
 
     router.push('/dashboard')
