@@ -19,24 +19,38 @@ interface ExerciseLog {
   notes: string
 }
 
+type PrevLog = { sets: number | null; reps: number | null; weight: number | null; rpe: number | null }
+
 export function GymSessionLogger({
   session,
   week,
   userId,
+  previousLogs = {},
 }: {
   session: GymSession
   week: number
   userId: string
+  previousLogs?: Record<string, PrevLog>
 }) {
   const router = useRouter()
   const allExercises = session.blocks.flatMap((b) => b.exercises)
 
   const [logs, setLogs] = useState<Record<string, ExerciseLog>>(
     Object.fromEntries(
-      allExercises.map((ex) => [
-        ex.name,
-        { done: false, sets: ex.sets, reps: ex.reps, weight: '', rpe: '', notes: '' },
-      ])
+      allExercises.map((ex) => {
+        const prev = previousLogs[ex.name]
+        return [
+          ex.name,
+          {
+            done: false,
+            sets: ex.sets,
+            reps: ex.reps,
+            weight: prev?.weight != null ? String(prev.weight) : '',
+            rpe: prev?.rpe != null ? String(prev.rpe) : '',
+            notes: '',
+          },
+        ]
+      })
     )
   )
   const [overallNotes, setOverallNotes] = useState('')
@@ -175,6 +189,7 @@ export function GymSessionLogger({
                 key={ex.name}
                 exercise={ex}
                 log={logs[ex.name]}
+                prevLog={previousLogs[ex.name] ?? null}
                 isExpanded={expandedEx === ex.name}
                 onToggleExpand={() => setExpandedEx(expandedEx === ex.name ? null : ex.name)}
                 onUpdate={(field, value) => updateLog(ex.name, field, value)}
@@ -235,12 +250,14 @@ export function GymSessionLogger({
 function ExerciseRow({
   exercise,
   log,
+  prevLog,
   isExpanded,
   onToggleExpand,
   onUpdate,
 }: {
   exercise: GymExercise
   log: ExerciseLog
+  prevLog: PrevLog | null
   isExpanded: boolean
   onToggleExpand: () => void
   onUpdate: (field: keyof ExerciseLog, value: string | boolean) => void
@@ -287,6 +304,11 @@ function ExerciseRow({
             <span className="text-xs px-2 py-0.5 rounded-full" style={{ background: 'var(--secondary)', color: 'var(--muted-foreground)' }}>
               {exercise.rest}
             </span>
+            {prevLog?.weight != null && (
+              <span className="text-xs px-2 py-0.5 rounded-full font-semibold" style={{ background: 'rgba(245,158,11,0.15)', color: 'var(--gym-accent)' }}>
+                Last: {prevLog.weight}kg
+              </span>
+            )}
           </div>
         </button>
 

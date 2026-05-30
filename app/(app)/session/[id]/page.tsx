@@ -19,7 +19,32 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
   if (planType === 'gym') {
     const session = getGymSessionBySlug(sessionSlug)
     if (!session) notFound()
-    return <GymSessionLogger session={session} week={week} userId={user.id} />
+
+    // Fetch most recent exercise logs for this session so the logger can pre-fill them
+    const { data: prevSession } = await supabase
+      .from('session_logs')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('session_name', session.name)
+      .eq('plan_type', 'gym')
+      .order('completed_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    type PrevLog = { sets: number | null; reps: number | null; weight: number | null; rpe: number | null }
+    const previousLogs: Record<string, PrevLog> = {}
+
+    if (prevSession) {
+      const { data: prevExercises } = await supabase
+        .from('exercise_logs')
+        .select('exercise_name, sets, reps, weight, rpe')
+        .eq('session_log_id', prevSession.id)
+      for (const ex of prevExercises ?? []) {
+        previousLogs[ex.exercise_name] = { sets: ex.sets, reps: ex.reps, weight: ex.weight, rpe: ex.rpe }
+      }
+    }
+
+    return <GymSessionLogger session={session} week={week} userId={user.id} previousLogs={previousLogs} />
   }
 
   const session = getFootballSessionById(sessionSlug)

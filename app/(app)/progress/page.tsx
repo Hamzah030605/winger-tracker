@@ -13,12 +13,30 @@ export default async function ProgressPage() {
 
   const { data: logs } = await supabase
     .from('session_logs')
-    .select('completed_at, plan_type, session_name, week_number')
+    .select('id, completed_at, plan_type, session_name, week_number, overall_notes')
     .eq('user_id', user.id)
     .gte('completed_at', ninetyDaysAgo.toISOString())
     .order('completed_at', { ascending: true })
 
   const allLogs = logs ?? []
+
+  // Fetch exercise logs for the 15 most recent sessions to show in history
+  type ExRow = { session_log_id: string; exercise_name: string; sets: number | null; reps: number | null; weight: number | null; rpe: number | null; notes: string | null }
+  const recentSessionIds = [...allLogs].reverse().slice(0, 15).map((l) => l.id)
+  let exerciseLogRows: ExRow[] = []
+  if (recentSessionIds.length > 0) {
+    const { data } = await supabase
+      .from('exercise_logs')
+      .select('session_log_id, exercise_name, sets, reps, weight, rpe, notes')
+      .in('session_log_id', recentSessionIds)
+    exerciseLogRows = (data ?? []) as ExRow[]
+  }
+
+  const exercisesBySession: Record<string, ExRow[]> = {}
+  for (const ex of exerciseLogRows) {
+    if (!exercisesBySession[ex.session_log_id]) exercisesBySession[ex.session_log_id] = []
+    exercisesBySession[ex.session_log_id]!.push(ex)
+  }
 
   // Build weekly stats (last 8 weeks)
   const weeklyStats: Array<{ label: string; gym: number; football: number }> = []
@@ -97,30 +115,63 @@ export default async function ProgressPage() {
           Recent Sessions
         </h2>
         <div className="space-y-2">
-          {[...allLogs].reverse().slice(0, 15).map((log, i) => (
-            <div
-              key={i}
-              className="rounded-xl px-4 py-3 flex items-center justify-between"
-              style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
-            >
-              <div>
-                <p className="font-medium text-sm" style={{ color: 'var(--foreground)' }}>{log.session_name}</p>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--muted-foreground)' }}>
-                  Wk {log.week_number} ·{' '}
-                  {new Date(log.completed_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
-                </p>
-              </div>
-              <span
-                className="text-xs font-semibold px-2 py-1 rounded-full"
-                style={{
-                  background: log.plan_type === 'gym' ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)',
-                  color: log.plan_type === 'gym' ? 'var(--gym-accent)' : 'var(--football-accent)',
-                }}
+          {[...allLogs].reverse().slice(0, 15).map((log, i) => {
+            const exercises = exercisesBySession[log.id] ?? []
+            const gymColor = 'var(--gym-accent)'
+            const footballColor = 'var(--football-accent)'
+            const accentColor = log.plan_type === 'gym' ? gymColor : footballColor
+            return (
+              <div
+                key={i}
+                className="rounded-xl overflow-hidden"
+                style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
               >
-                {log.plan_type === 'gym' ? '🏋️' : '⚽'}
-              </span>
-            </div>
-          ))}
+                <div className="px-4 py-3 flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-sm" style={{ color: 'var(--foreground)' }}>{log.session_name}</p>
+                    <p className="text-xs mt-0.5" style={{ color: 'var(--muted-foreground)' }}>
+                      Wk {log.week_number} ·{' '}
+                      {new Date(log.completed_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', weekday: 'short' })}
+                    </p>
+                  </div>
+                  <span
+                    className="text-xs font-semibold px-2 py-1 rounded-full"
+                    style={{
+                      background: log.plan_type === 'gym' ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)',
+                      color: accentColor,
+                    }}
+                  >
+                    {log.plan_type === 'gym' ? '🏋️' : '⚽'} {exercises.length > 0 ? `${exercises.length} ex` : ''}
+                  </span>
+                </div>
+                {exercises.length > 0 && (
+                  <div className="px-4 pb-3 space-y-1 border-t" style={{ borderColor: 'var(--border)' }}>
+                    {exercises.map((ex, j) => (
+                      <div key={j} className="flex items-center justify-between py-1">
+                        <p className="text-xs font-medium" style={{ color: 'var(--foreground)' }}>{ex.exercise_name}</p>
+                        <div className="flex gap-2 text-xs" style={{ color: 'var(--muted-foreground)' }}>
+                          {ex.sets != null && ex.reps != null && (
+                            <span>{ex.sets}×{ex.reps}</span>
+                          )}
+                          {ex.weight != null && (
+                            <span style={{ color: accentColor, fontWeight: 600 }}>{ex.weight}kg</span>
+                          )}
+                          {ex.rpe != null && (
+                            <span>RPE {ex.rpe}</span>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {log.overall_notes && (
+                      <p className="text-xs mt-1 pt-1 border-t italic" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>
+                        {log.overall_notes}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </div>
+            )
+          })}
           {allLogs.length === 0 && (
             <p className="text-center py-8" style={{ color: 'var(--muted-foreground)' }}>
               No sessions logged yet. Start your first session!
