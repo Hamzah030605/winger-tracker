@@ -7,6 +7,8 @@ import { TodaySessionCard } from '@/components/dashboard/today-session-card'
 import { AdvanceWeekButton } from '@/components/dashboard/advance-week-button'
 import { MissionCard } from '@/components/dashboard/mission-card'
 import { DevOpsWidget } from '@/components/dashboard/devops-widget'
+import { LifeScoreCard } from '@/components/dashboard/life-score-card'
+import Link from 'next/link'
 
 function greeting(): string {
   const h = new Date().getHours()
@@ -15,7 +17,6 @@ function greeting(): string {
   return 'Good evening'
 }
 
-/** ISO weekday name from today's Date */
 function getTodayName(): string {
   return ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][
     new Date().getDay()
@@ -31,11 +32,10 @@ export default async function DashboardPage() {
 
   const todayStr = new Date().toLocaleDateString('sv-SE')
 
-  // ── Monday of this calendar week ─────────────────────────────────────────
+  // Monday of this calendar week
   const thisWeekStart = new Date()
   thisWeekStart.setDate(thisWeekStart.getDate() - ((thisWeekStart.getDay() + 6) % 7))
   thisWeekStart.setHours(0, 0, 0, 0)
-  const thisWeekStartStr = thisWeekStart.toLocaleDateString('sv-SE')
 
   const [
     { data: profile },
@@ -44,6 +44,7 @@ export default async function DashboardPage() {
     { data: weekSessionLogs },
     { data: devopsTopics },
     { data: devopsLastLog },
+    { data: weekDevopsLogs },
   ] = await Promise.all([
     supabase.from('profiles').select('*').eq('user_id', user.id).single(),
     supabase
@@ -75,16 +76,19 @@ export default async function DashboardPage() {
       .eq('user_id', user.id)
       .order('logged_at', { ascending: false })
       .limit(1),
+    supabase
+      .from('devops_logs')
+      .select('duration_minutes')
+      .eq('user_id', user.id)
+      .gte('logged_at', thisWeekStart.toISOString()),
   ])
 
-  // ── Week calculation from plan_start_date ─────────────────────────────────
+  // ── Week calculation ──────────────────────────────────────────────────────
   const planStartDate = profile?.plan_start_date ?? getNextMonday()
   const preStart = isPreStart(planStartDate)
   const currentWeek = preStart ? 0 : calculateCurrentWeek(planStartDate)
 
   const today = getTodayName()
-
-  // Sessions visible only when programme is active
   const { gym: gymSession, football: footballSession } = preStart
     ? { gym: null, football: null }
     : getTodaySessions(today)
@@ -99,12 +103,27 @@ export default async function DashboardPage() {
   const habitPct = totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0
   const habitsWithLog = activeHabits.map((h) => ({ ...h, logged_today: loggedIds.has(h.id) }))
 
-  // ── This-week session counts ──────────────────────────────────────────────
+  // ── Session counts ────────────────────────────────────────────────────────
   const thisWeekLogs = weekSessionLogs ?? []
   const gymSessionsThisWeek = thisWeekLogs.filter((l) => l.plan_type === 'gym').length
   const footballSessionsThisWeek = thisWeekLogs.filter((l) => l.plan_type === 'football').length
 
-  // ── Programme phase label ─────────────────────────────────────────────────
+  // ── Life Score components ─────────────────────────────────────────────────
+  const habitScore = habitPct
+
+  const gymScore = Math.min(Math.round((gymSessionsThisWeek / 5) * 100), 100)
+
+  const footballScore = Math.min(Math.round((footballSessionsThisWeek / 3) * 100), 100)
+
+  const devopsMinsThisWeek = (weekDevopsLogs ?? []).reduce(
+    (sum, l) => sum + (l.duration_minutes ?? 0), 0
+  )
+  const devopsScore = Math.min(Math.round((devopsMinsThisWeek / 300) * 100), 100)
+
+  const arabicHabit = activeHabits.find((h) => h.name === 'Arabic Study')
+  const arabicScore = arabicHabit && loggedIds.has(arabicHabit.id) ? 100 : 0
+
+  // ── Programme phase ───────────────────────────────────────────────────────
   const gymPhase = currentWeek > 0
     ? GYM_PLAN.weeklyProgressions.find((p) => {
         const [start, end] = p.weekRange.split('-').map(Number)
@@ -116,7 +135,7 @@ export default async function DashboardPage() {
   const currentDevOpsTopic = (devopsTopics ?? [])[0] ?? null
   const lastDevOpsStudied = (devopsLastLog ?? [])[0]?.logged_at ?? null
 
-  // ── UI values ─────────────────────────────────────────────────────────────
+  // ── UI ────────────────────────────────────────────────────────────────────
   const dateLabel = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })
 
   const r = 30
@@ -124,7 +143,6 @@ export default async function DashboardPage() {
   const dashOffset = circ - (circ * habitPct) / 100
   const ringColor = habitPct === 100 ? '#10b981' : habitPct > 50 ? '#f59e0b' : 'var(--primary)'
 
-  // Format plan_start_date for pre-start banner
   const planStartFormatted = new Date(planStartDate + 'T00:00:00').toLocaleDateString('en-GB', {
     weekday: 'long',
     day: 'numeric',
@@ -134,7 +152,7 @@ export default async function DashboardPage() {
   return (
     <div className="px-4 pt-5 pb-6 max-w-lg mx-auto space-y-3">
 
-      {/* ── Header ── */}
+      {/* ── 1. Greeting + Habit Ring ── */}
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
           <p className="text-[11px] font-semibold uppercase tracking-[0.1em]" style={{ color: 'var(--muted-foreground)' }}>
@@ -155,7 +173,7 @@ export default async function DashboardPage() {
           ) : null}
         </div>
 
-        {/* Habit ring */}
+        {/* ── 2. Habit Ring ── */}
         <div className="flex-shrink-0 flex flex-col items-center">
           <svg width="68" height="68" viewBox="0 0 76 76">
             <circle cx="38" cy="38" r={r} fill="none" stroke="var(--secondary)" strokeWidth="7" />
@@ -180,7 +198,7 @@ export default async function DashboardPage() {
         </div>
       </div>
 
-      {/* ── Pre-start banner ── */}
+      {/* Pre-start banner */}
       {preStart && (
         <div
           className="rounded-2xl px-4 py-4 flex items-center gap-3"
@@ -201,7 +219,7 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {/* ── Today's Mission ── */}
+      {/* ── 3. Today's Mission ── */}
       {totalCount > 0 && (
         <MissionCard
           habits={habitsWithLog}
@@ -211,10 +229,17 @@ export default async function DashboardPage() {
         />
       )}
 
-      {/* ── DevOps Focus ── */}
-      <DevOpsWidget topicRow={currentDevOpsTopic} lastStudied={lastDevOpsStudied} />
+      {/* ── 4. Life Score ── */}
+      <LifeScoreCard
+        habitScore={habitScore}
+        gymScore={gymScore}
+        footballScore={footballScore}
+        devopsScore={devopsScore}
+        arabicScore={arabicScore}
+        preStart={preStart}
+      />
 
-      {/* ── Today's Training ── */}
+      {/* ── 5. Today's Training ── */}
       <div>
         <p className="text-[10px] font-bold uppercase tracking-[0.12em] mb-2 px-0.5" style={{ color: 'var(--muted-foreground)' }}>
           Today&apos;s Training
@@ -239,7 +264,7 @@ export default async function DashboardPage() {
             className="rounded-2xl px-4 py-4 flex items-center gap-3"
             style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
           >
-            <span className="text-xl">🧘</span>
+            <span className="text-xl">���</span>
             <div>
               <p className="font-semibold text-sm" style={{ color: 'var(--foreground)' }}>Rest Day</p>
               <p className="text-xs mt-0.5" style={{ color: 'var(--muted-foreground)' }}>
@@ -279,21 +304,40 @@ export default async function DashboardPage() {
         )}
       </div>
 
-      {/* ── Stats row ── */}
+      {/* ── 6. DevOps Focus ── */}
+      <DevOpsWidget topicRow={currentDevOpsTopic} lastStudied={lastDevOpsStudied} />
+
+      {/* ── 7. Focus Session widget (placeholder until /focus is built) ── */}
+      <Link
+        href="/focus"
+        className="rounded-2xl px-4 py-4 flex items-center justify-between"
+        style={{
+          background: 'linear-gradient(135deg, #16161a 0%, #16201a 100%)',
+          border: '1px solid rgba(16,185,129,0.2)',
+          display: 'flex',
+        }}
+      >
+        <div className="flex items-center gap-3">
+          <span className="text-xl">⏱</span>
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-[0.12em]" style={{ color: '#10b981' }}>
+              Focus Session
+            </p>
+            <p className="text-xs mt-0.5" style={{ color: 'var(--muted-foreground)' }}>
+              25 min deep work · Pomodoro timer
+            </p>
+          </div>
+        </div>
+        <span className="text-xs font-semibold px-3 py-1.5 rounded-xl" style={{ background: 'rgba(16,185,129,0.15)', color: '#10b981' }}>
+          Start →
+        </span>
+      </Link>
+
+      {/* ── 8. Quick Progress Cards ── */}
       <div className="grid grid-cols-3 gap-2">
         {[
-          {
-            label: 'Habits',
-            value: doneCount,
-            suffix: `/${totalCount}`,
-            color: ringColor,
-          },
-          {
-            label: 'Gym this wk',
-            value: gymSessionsThisWeek,
-            suffix: preStart ? '' : '/5',
-            color: 'var(--gym-accent)',
-          },
+          { label: 'Habits', value: doneCount, suffix: `/${totalCount}`, color: ringColor },
+          { label: 'Gym this wk', value: gymSessionsThisWeek, suffix: preStart ? '' : '/5', color: 'var(--gym-accent)' },
           {
             label: preStart ? 'Pre-start' : `Week ${currentWeek}`,
             value: preStart ? '–' : `Wk ${currentWeek}`,
@@ -321,12 +365,11 @@ export default async function DashboardPage() {
         ))}
       </div>
 
-      {/* ── Football sessions this week ── */}
       {!preStart && (
         <div className="grid grid-cols-2 gap-2">
           {[
             { label: 'Football this wk', value: footballSessionsThisWeek, total: 3, color: 'var(--football-accent)' },
-            { label: 'Total this wk', value: gymSessionsThisWeek + footballSessionsThisWeek, total: 8, color: 'var(--foreground)' },
+            { label: 'DevOps mins', value: devopsMinsThisWeek, total: 300, color: 'var(--devops-accent)' },
           ].map((s) => (
             <div
               key={s.label}
@@ -347,7 +390,7 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {/* ── Advance week (hidden — week auto-calculates from plan_start_date) ── */}
+      {/* ── Programme status ── */}
       <AdvanceWeekButton
         currentWeek={currentWeek}
         maxWeek={GYM_PLAN.totalWeeks}
