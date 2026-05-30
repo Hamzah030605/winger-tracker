@@ -225,3 +225,61 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON public.habit_logs     TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.devops_topics  TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.devops_logs    TO authenticated;
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.devops_tasks   TO authenticated;
+
+-- ─── Migration 1: Fix plan_start_date to next Monday ─────────────────────────
+-- Run once in Supabase SQL Editor after the table grants above.
+-- Moves any plan_start_date that is <= today to the next upcoming Monday.
+/*
+UPDATE public.profiles
+SET plan_start_date = CURRENT_DATE + (
+  CASE EXTRACT(DOW FROM CURRENT_DATE)::int
+    WHEN 0 THEN 1
+    WHEN 1 THEN 0
+    ELSE 8 - EXTRACT(DOW FROM CURRENT_DATE)::int
+  END
+) * INTERVAL '1 day'
+WHERE plan_start_date <= CURRENT_DATE;
+*/
+
+-- ─── focus_sessions ──────────────────────────────────────────────────────────
+-- Run Migration 2 in Supabase SQL Editor
+/*
+CREATE TABLE IF NOT EXISTS public.focus_sessions (
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id          UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  session_type     TEXT NOT NULL CHECK (session_type IN ('devops','arabic','reading','deep_work','training')),
+  duration_minutes INTEGER NOT NULL DEFAULT 25,
+  started_at       TIMESTAMPTZ NOT NULL,
+  completed_at     TIMESTAMPTZ,
+  notes            TEXT,
+  created_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS focus_sessions_user_id_idx    ON public.focus_sessions(user_id);
+CREATE INDEX IF NOT EXISTS focus_sessions_started_at_idx ON public.focus_sessions(started_at);
+ALTER TABLE public.focus_sessions ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "focus_sessions: own rows" ON public.focus_sessions
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.focus_sessions TO authenticated;
+*/
+
+-- ─── weekly_reviews ───────────────────────────────────────────────────────────
+-- Run Migration 3 in Supabase SQL Editor
+/*
+CREATE TABLE IF NOT EXISTS public.weekly_reviews (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id         UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  week_start_date DATE NOT NULL,
+  went_well       TEXT,
+  went_badly      TEXT,
+  biggest_win     TEXT,
+  biggest_lesson  TEXT,
+  focus_next_week TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(user_id, week_start_date)
+);
+ALTER TABLE public.weekly_reviews ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "weekly_reviews: own rows" ON public.weekly_reviews
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.weekly_reviews TO authenticated;
+*/

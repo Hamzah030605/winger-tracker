@@ -69,6 +69,44 @@ export function isSameDay(a: Date, b: Date): boolean {
   )
 }
 
+// ─── Programme week helpers ───────────────────────────────────────────────────
+
+/**
+ * Returns the next upcoming Monday as a YYYY-MM-DD string.
+ * If `from` is already Monday, returns that Monday.
+ */
+export function getNextMonday(from: Date = new Date()): string {
+  const d = new Date(from)
+  d.setHours(0, 0, 0, 0)
+  const dow = d.getDay() // 0=Sun, 1=Mon, ..., 6=Sat
+  if (dow !== 1) {
+    const daysToAdd = dow === 0 ? 1 : 8 - dow
+    d.setDate(d.getDate() + daysToAdd)
+  }
+  return d.toLocaleDateString('sv-SE')
+}
+
+/**
+ * Returns the programme week number (1–6) calculated from plan_start_date.
+ * Returns 0 if today is before plan_start_date (pre-start).
+ */
+export function calculateCurrentWeek(planStartDate: string, totalWeeks = 6): number {
+  const start = new Date(planStartDate)
+  start.setHours(0, 0, 0, 0)
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  if (today < start) return 0
+  const diffDays = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24))
+  return Math.min(Math.floor(diffDays / 7) + 1, totalWeeks)
+}
+
+/**
+ * Returns true if today is before plan_start_date.
+ */
+export function isPreStart(planStartDate: string): boolean {
+  return calculateCurrentWeek(planStartDate) === 0
+}
+
 export function slugify(str: string): string {
   return str.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
 }
