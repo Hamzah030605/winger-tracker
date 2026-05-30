@@ -145,26 +145,39 @@ export default async function ProgressPage() {
                   </span>
                 </div>
                 {exercises.length > 0 && (
-                  <div className="px-4 pb-3 space-y-1 border-t" style={{ borderColor: 'var(--border)' }}>
+                  <div className="px-4 pb-3 pt-2 space-y-2 border-t" style={{ borderColor: 'var(--border)' }}>
                     {exercises.map((ex, j) => (
-                      <div key={j} className="flex items-center justify-between py-1">
-                        <p className="text-xs font-medium" style={{ color: 'var(--foreground)' }}>{ex.exercise_name}</p>
-                        <div className="flex gap-2 text-xs" style={{ color: 'var(--muted-foreground)' }}>
-                          {ex.sets != null && ex.reps != null && (
-                            <span>{ex.sets}×{ex.reps}</span>
-                          )}
-                          {ex.weight != null && (
-                            <span style={{ color: accentColor, fontWeight: 600 }}>{ex.weight}kg</span>
-                          )}
-                          {ex.rpe != null && (
-                            <span>RPE {ex.rpe}</span>
-                          )}
+                      <div key={j}>
+                        <div className="flex items-start justify-between gap-2">
+                          <p className="text-xs font-medium leading-tight" style={{ color: 'var(--foreground)' }}>{ex.exercise_name}</p>
+                          <div className="flex gap-1 flex-wrap justify-end shrink-0">
+                            {ex.sets != null && ex.reps != null && (
+                              <span className="text-[11px] px-1.5 py-0.5 rounded-md" style={{ background: 'var(--secondary)', color: 'var(--muted-foreground)' }}>
+                                {ex.sets}×{ex.reps}
+                              </span>
+                            )}
+                            {ex.weight != null && (
+                              <span className="text-[11px] px-1.5 py-0.5 rounded-md font-semibold" style={{ background: log.plan_type === 'gym' ? 'rgba(245,158,11,0.15)' : 'rgba(16,185,129,0.15)', color: accentColor }}>
+                                {ex.weight}kg
+                              </span>
+                            )}
+                            {ex.rpe != null && (
+                              <span className="text-[11px] px-1.5 py-0.5 rounded-md" style={{ background: 'var(--secondary)', color: 'var(--muted-foreground)' }}>
+                                RPE {ex.rpe}
+                              </span>
+                            )}
+                          </div>
                         </div>
+                        {ex.notes && (
+                          <p className="text-[11px] mt-0.5 italic" style={{ color: 'var(--muted-foreground)' }}>
+                            {ex.notes}
+                          </p>
+                        )}
                       </div>
                     ))}
                     {log.overall_notes && (
-                      <p className="text-xs mt-1 pt-1 border-t italic" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>
-                        {log.overall_notes}
+                      <p className="text-xs pt-2 border-t italic" style={{ borderColor: 'var(--border)', color: 'var(--muted-foreground)' }}>
+                        Session: {log.overall_notes}
                       </p>
                     )}
                   </div>

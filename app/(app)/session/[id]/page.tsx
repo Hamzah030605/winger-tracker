@@ -31,16 +31,16 @@ export default async function SessionPage({ params }: { params: Promise<{ id: st
       .limit(1)
       .maybeSingle()
 
-    type PrevLog = { sets: number | null; reps: number | null; weight: number | null; rpe: number | null }
+    type PrevLog = { sets: number | null; reps: number | null; weight: number | null; rpe: number | null; notes: string | null }
     const previousLogs: Record<string, PrevLog> = {}
 
     if (prevSession) {
       const { data: prevExercises } = await supabase
         .from('exercise_logs')
-        .select('exercise_name, sets, reps, weight, rpe')
+        .select('exercise_name, sets, reps, weight, rpe, notes')
         .eq('session_log_id', prevSession.id)
       for (const ex of prevExercises ?? []) {
-        previousLogs[ex.exercise_name] = { sets: ex.sets, reps: ex.reps, weight: ex.weight, rpe: ex.rpe }
+        previousLogs[ex.exercise_name] = { sets: ex.sets, reps: ex.reps, weight: ex.weight, rpe: ex.rpe, notes: ex.notes }
       }
     }
 

@@ -19,7 +19,7 @@ interface ExerciseLog {
   notes: string
 }
 
-type PrevLog = { sets: number | null; reps: number | null; weight: number | null; rpe: number | null }
+type PrevLog = { sets: number | null; reps: number | null; weight: number | null; rpe: number | null; notes: string | null }
 
 export function GymSessionLogger({
   session,
@@ -43,8 +43,8 @@ export function GymSessionLogger({
           ex.name,
           {
             done: false,
-            sets: ex.sets,
-            reps: ex.reps,
+            sets: prev?.sets != null ? String(prev.sets) : ex.sets,
+            reps: prev?.reps != null ? String(prev.reps) : ex.reps,
             weight: prev?.weight != null ? String(prev.weight) : '',
             rpe: prev?.rpe != null ? String(prev.rpe) : '',
             notes: '',
