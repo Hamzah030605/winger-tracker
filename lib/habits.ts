@@ -38,14 +38,38 @@ export async function seedHabitsIfMissing(
   supabase: SupabaseClient<Database>,
   userId: string,
 ) {
-  const { count } = await supabase
-    .from('habits')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', userId)
+  // Primary path: SECURITY DEFINER RPC — atomic count+insert in Postgres, bypasses RLS edge-cases
+  const { data: rpcResult, error: rpcError } = await supabase.rpc('seed_default_habits')
 
-  if ((count ?? 0) === 0) {
-    await supabase.from('habits').insert(
-      DEFAULT_HABITS.map((h) => ({ ...h, user_id: userId }))
-    )
+  if (!rpcError) {
+    if (rpcResult?.error) {
+      console.error('[habits:seed] RPC returned auth error:', rpcResult.error)
+    }
+    // seeded=true means we just inserted; seeded=false means habits already exist — both are fine
+    return
+  }
+
+  // RPC not available (function not yet created in Supabase) — fall back to direct insert
+  console.error('[habits:seed] RPC failed, using fallback insert. RPC error:', rpcError.message)
+
+  const { data: existing, error: selectError } = await supabase
+    .from('habits')
+    .select('id')
+    .eq('user_id', userId)
+    .limit(1)
+
+  if (selectError) {
+    console.error('[habits:seed] select check failed:', selectError.message, selectError.code)
+    return
+  }
+
+  if (existing && existing.length > 0) return // habits already exist
+
+  const { error: insertError } = await supabase.from('habits').insert(
+    DEFAULT_HABITS.map((h) => ({ ...h, user_id: userId }))
+  )
+
+  if (insertError) {
+    console.error('[habits:seed] insert failed:', insertError.message, insertError.code, insertError.details)
   }
 }

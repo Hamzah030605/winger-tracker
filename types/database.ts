@@ -264,7 +264,12 @@ export type Database = {
       }
     }
     Views: Record<string, never>
-    Functions: Record<string, never>
+    Functions: {
+      seed_default_habits: {
+        Args: Record<string, never>
+        Returns: { seeded: boolean; inserted?: number; existing?: number; error?: string }
+      }
+    }
     Enums: Record<string, never>
     CompositeTypes: Record<string, never>
   }

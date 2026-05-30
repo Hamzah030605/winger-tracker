@@ -156,3 +156,52 @@ DROP TRIGGER IF EXISTS on_auth_user_created ON auth.users;
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE PROCEDURE public.handle_new_user();
+
+-- ─── seed_default_habits RPC ─────────────────────────────────
+-- Called by the app on page load for existing users who signed up
+-- before the trigger existed. SECURITY DEFINER bypasses RLS edge-cases.
+-- Run this separately in the SQL editor after the tables above.
+CREATE OR REPLACE FUNCTION public.seed_default_habits()
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_uid   uuid := auth.uid();
+  v_count integer;
+BEGIN
+  IF v_uid IS NULL THEN
+    RETURN jsonb_build_object('error', 'not authenticated');
+  END IF;
+
+  SELECT COUNT(*) INTO v_count FROM public.habits WHERE user_id = v_uid;
+
+  IF v_count = 0 THEN
+    INSERT INTO public.habits (user_id, name, category, sort_order) VALUES
+      (v_uid, 'Fajr + Morning Dhikr',                    'deen',        0),
+      (v_uid, 'Quran 10–20 mins',                        'deen',        1),
+      (v_uid, 'Pray 5 Salah in the Mosque',              'deen',        2),
+      (v_uid, 'Daily Islamic Reminder / Reading',        'deen',        3),
+      (v_uid, 'Wake Up For Fajr + Train',                'football',    4),
+      (v_uid, 'Football Session / Ball Mastery',         'football',    5),
+      (v_uid, 'Mobility / Stretching',                   'football',    6),
+      (v_uid, 'Shower + Full Morning Grooming',          'physique',    7),
+      (v_uid, 'Post-Workout Protein Shake',              'physique',    8),
+      (v_uid, 'Night Skincare + Minoxidil',              'physique',    9),
+      (v_uid, '10k Steps + 2.5–3L Water',               'physique',   10),
+      (v_uid, 'No Junk / No Late-Night Eating',         'physique',   11),
+      (v_uid, 'DevOps Study 60+ mins',                   'career',     12),
+      (v_uid, 'Hands-On Lab',                            'career',     13),
+      (v_uid, 'Arabic Study',                            'growth',     14),
+      (v_uid, 'Read For 30–60 Minutes',                  'growth',     15),
+      (v_uid, 'Not In Bed After Fajr Until After Isha',  'discipline', 16);
+    RETURN jsonb_build_object('seeded', true, 'inserted', 17);
+  ELSE
+    RETURN jsonb_build_object('seeded', false, 'existing', v_count);
+  END IF;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.seed_default_habits() TO authenticated;
+GRANT EXECUTE ON FUNCTION public.seed_default_habits() TO anon;
