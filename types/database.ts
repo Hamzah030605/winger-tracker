@@ -262,6 +262,45 @@ export type Database = {
         }
         Relationships: []
       }
+      weekly_reviews: {
+        Row: {
+          id: string
+          user_id: string
+          week_start_date: string
+          went_well: string | null
+          went_badly: string | null
+          biggest_win: string | null
+          biggest_lesson: string | null
+          focus_next_week: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          week_start_date: string
+          went_well?: string | null
+          went_badly?: string | null
+          biggest_win?: string | null
+          biggest_lesson?: string | null
+          focus_next_week?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          week_start_date?: string
+          went_well?: string | null
+          went_badly?: string | null
+          biggest_win?: string | null
+          biggest_lesson?: string | null
+          focus_next_week?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       focus_sessions: {
         Row: {
           id: string
@@ -327,3 +366,5 @@ export type InsertHabitLog = Database['public']['Tables']['habit_logs']['Insert'
 
 export type FocusSession = Database['public']['Tables']['focus_sessions']['Row']
 export type InsertFocusSession = Database['public']['Tables']['focus_sessions']['Insert']
+
+export type WeeklyReview = Database['public']['Tables']['weekly_reviews']['Row']
