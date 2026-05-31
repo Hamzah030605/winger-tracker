@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { calculateStreak } from '@/lib/utils'
 import { PomodoroTimer } from '@/components/focus/pomodoro-timer'
 import type { FocusSession } from '@/types/database'
 
@@ -14,7 +15,10 @@ export default async function FocusPage() {
   weekStart.setDate(weekStart.getDate() - ((weekStart.getDay() + 6) % 7))
   weekStart.setHours(0, 0, 0, 0)
 
-  const [{ data: todaySessions }, { data: weekSessions }] = await Promise.all([
+  const sixtyDaysAgo = new Date()
+  sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60)
+
+  const [{ data: todaySessions }, { data: weekSessions }, { data: streakSessions }] = await Promise.all([
     supabase
       .from('focus_sessions')
       .select('*')
@@ -28,14 +32,22 @@ export default async function FocusPage() {
       .eq('user_id', user.id)
       .gte('started_at', weekStart.toISOString())
       .not('completed_at', 'is', null),
+    supabase
+      .from('focus_sessions')
+      .select('started_at')
+      .eq('user_id', user.id)
+      .gte('started_at', sixtyDaysAgo.toISOString())
+      .not('completed_at', 'is', null)
+      .order('started_at', { ascending: false }),
   ])
 
   const weekSess = weekSessions ?? []
   const weeklyMinutes = weekSess.reduce((sum, s) => sum + (s.duration_minutes ?? 0), 0)
   const weeklySessionCount = weekSess.length
+  const streak = calculateStreak((streakSessions ?? []).map((s) => s.started_at))
 
   return (
-    <div className="px-4 pt-5 pb-6 max-w-lg mx-auto space-y-4">
+    <div className="px-4 pt-5 pb-24 max-w-lg mx-auto space-y-4">
 
       {/* Header */}
       <div>
@@ -43,7 +55,7 @@ export default async function FocusPage() {
           Focus
         </p>
         <h1 className="text-[22px] font-bold leading-tight mt-0.5" style={{ color: 'var(--foreground)' }}>
-          Pomodoro Timer
+          Deep Work
         </h1>
         <p className="text-xs mt-0.5" style={{ color: 'var(--muted-foreground)' }}>
           25 min focus · 5 min break · background-accurate
@@ -55,6 +67,7 @@ export default async function FocusPage() {
         todaySessions={(todaySessions ?? []) as FocusSession[]}
         weeklyMinutes={weeklyMinutes}
         weeklySessionCount={weeklySessionCount}
+        streak={streak}
       />
     </div>
   )
