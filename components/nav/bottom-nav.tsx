@@ -109,6 +109,25 @@ const NAV_ITEMS = [
       </svg>
     ),
   },
+  {
+    href: '/notes',
+    label: 'Notes',
+    icon: (active: boolean) => (
+      <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
+        <rect
+          x="4" y="2" width="16" height="20" rx="2"
+          stroke={active ? '#f59e0b' : 'var(--muted-foreground)'}
+          strokeWidth="2"
+        />
+        <path
+          d="M8 7h8M8 11h8M8 15h5"
+          stroke={active ? '#f59e0b' : 'var(--muted-foreground)'}
+          strokeWidth="1.8"
+          strokeLinecap="round"
+        />
+      </svg>
+    ),
+  },
 ]
 
 export function BottomNav() {

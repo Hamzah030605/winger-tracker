@@ -301,6 +301,36 @@ export type Database = {
         }
         Relationships: []
       }
+      daily_notes: {
+        Row: {
+          id: string
+          user_id: string
+          note_date: string
+          content: string | null
+          tasks: { id: string; text: string; done: boolean }[]
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          note_date?: string
+          content?: string | null
+          tasks?: { id: string; text: string; done: boolean }[]
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          note_date?: string
+          content?: string | null
+          tasks?: { id: string; text: string; done: boolean }[]
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       focus_sessions: {
         Row: {
           id: string
@@ -368,3 +398,6 @@ export type FocusSession = Database['public']['Tables']['focus_sessions']['Row']
 export type InsertFocusSession = Database['public']['Tables']['focus_sessions']['Insert']
 
 export type WeeklyReview = Database['public']['Tables']['weekly_reviews']['Row']
+
+export type DailyNote = Database['public']['Tables']['daily_notes']['Row']
+export type NoteTask = { id: string; text: string; done: boolean }

@@ -262,6 +262,26 @@ CREATE POLICY "focus_sessions: own rows" ON public.focus_sessions
 GRANT SELECT, INSERT, UPDATE, DELETE ON public.focus_sessions TO authenticated;
 */
 
+-- ─── daily_notes ─────────────────────────────────────────────────────────────
+-- Run Migration 4 in Supabase SQL Editor
+/*
+CREATE TABLE IF NOT EXISTS public.daily_notes (
+  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id       UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
+  note_date     DATE NOT NULL DEFAULT CURRENT_DATE,
+  content       TEXT,
+  tasks         JSONB NOT NULL DEFAULT '[]',
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  UNIQUE(user_id, note_date)
+);
+CREATE INDEX IF NOT EXISTS daily_notes_user_date_idx ON public.daily_notes(user_id, note_date);
+ALTER TABLE public.daily_notes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "daily_notes: own rows" ON public.daily_notes
+  FOR ALL USING (auth.uid() = user_id) WITH CHECK (auth.uid() = user_id);
+GRANT SELECT, INSERT, UPDATE, DELETE ON public.daily_notes TO authenticated;
+*/
+
 -- ─── weekly_reviews ───────────────────────────────────────────────────────────
 -- Run Migration 3 in Supabase SQL Editor
 /*
