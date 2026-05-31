@@ -120,14 +120,18 @@ function getTypeMeta(value: SessionType) {
   return SESSION_TYPES.find((t) => t.value === value) ?? SESSION_TYPES[0]!
 }
 
+const WEEKLY_SESSION_GOAL = 5
+const DAILY_SESSION_MIN   = 1
+
 // ─── Component ────────────────────────────────────────────────────────────────
 interface Props {
   userId: string
   todaySessions: FocusSession[]
   weeklyMinutes: number
+  weeklySessionCount: number
 }
 
-export function PomodoroTimer({ userId, todaySessions: initSessions, weeklyMinutes: initWeekMins }: Props) {
+export function PomodoroTimer({ userId, todaySessions: initSessions, weeklyMinutes: initWeekMins, weeklySessionCount: initWeekCount }: Props) {
   const router = useRouter()
   const [timerState, setTimerState] = useState<TimerState>(DEFAULT_STATE)
   const [tick, setTick] = useState(0)
@@ -136,6 +140,7 @@ export function PomodoroTimer({ userId, todaySessions: initSessions, weeklyMinut
   const [saveError, setSaveError] = useState('')
   const [todaySessions, setTodaySessions] = useState(initSessions)
   const [weeklyMinutes, setWeeklyMinutes] = useState(initWeekMins)
+  const [weeklySessionCount, setWeeklySessionCount] = useState(initWeekCount)
 
   const audioRef = useRef<AudioContext | null>(null)
   const didCompleteRef = useRef(false)
@@ -143,6 +148,7 @@ export function PomodoroTimer({ userId, todaySessions: initSessions, weeklyMinut
   // Sync props after router.refresh()
   useEffect(() => { setTodaySessions(initSessions) }, [initSessions])
   useEffect(() => { setWeeklyMinutes(initWeekMins) }, [initWeekMins])
+  useEffect(() => { setWeeklySessionCount(initWeekCount) }, [initWeekCount])
 
   // Restore from localStorage on first mount
   useEffect(() => {
@@ -589,7 +595,73 @@ export function PomodoroTimer({ userId, todaySessions: initSessions, weeklyMinut
         </div>
       )}
 
-      {/* ── Weekly stat + today's sessions ── */}
+      {/* ── Goals card ── */}
+      {(() => {
+        const weekDone   = Math.min(weeklySessionCount, WEEKLY_SESSION_GOAL)
+        const weekGoalMet = weekDone >= WEEKLY_SESSION_GOAL
+        const weekColor  = weekGoalMet ? '#10b981' : weekDone >= 3 ? '#f59e0b' : 'var(--primary)'
+        const todayDone  = todaySessions.length >= DAILY_SESSION_MIN
+        return (
+          <div
+            className="rounded-2xl px-4 py-4 space-y-3"
+            style={{ background: 'var(--card)', border: '1px solid var(--border)' }}
+          >
+            {/* Weekly goal */}
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[11px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--muted-foreground)' }}>
+                  Weekly goal
+                </p>
+                <span className="text-[11px] font-bold" style={{ color: weekColor }}>
+                  {weekDone} / {WEEKLY_SESSION_GOAL} sessions
+                  {weekGoalMet && ' ✓'}
+                </span>
+              </div>
+              <div className="flex gap-1.5">
+                {Array.from({ length: WEEKLY_SESSION_GOAL }).map((_, i) => (
+                  <div
+                    key={i}
+                    className="flex-1 h-2.5 rounded-full transition-all"
+                    style={{
+                      background: i < weekDone ? weekColor : 'var(--secondary)',
+                      border: i < weekDone ? 'none' : '1px solid var(--border)',
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Daily minimum */}
+            <div
+              className="flex items-center justify-between rounded-xl px-3 py-2.5"
+              style={{
+                background: todayDone ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.06)',
+                border: `1px solid ${todayDone ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.2)'}`,
+              }}
+            >
+              <div className="flex items-center gap-2">
+                <span className="text-base">{todayDone ? '✅' : '⏳'}</span>
+                <div>
+                  <p className="text-xs font-semibold" style={{ color: 'var(--foreground)' }}>
+                    Daily minimum
+                  </p>
+                  <p className="text-[10px]" style={{ color: 'var(--muted-foreground)' }}>
+                    {DAILY_SESSION_MIN} session per day
+                  </p>
+                </div>
+              </div>
+              <span
+                className="text-[11px] font-bold"
+                style={{ color: todayDone ? '#10b981' : '#ef4444' }}
+              >
+                {todayDone ? 'Done' : `${todaySessions.length}/${DAILY_SESSION_MIN}`}
+              </span>
+            </div>
+          </div>
+        )
+      })()}
+
+      {/* ── Stats row ── */}
       <div className="grid grid-cols-2 gap-2">
         <div
           className="rounded-xl p-3 text-center"

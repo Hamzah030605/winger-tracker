@@ -30,9 +30,9 @@ export default async function FocusPage() {
       .not('completed_at', 'is', null),
   ])
 
-  const weeklyMinutes = (weekSessions ?? []).reduce(
-    (sum, s) => sum + (s.duration_minutes ?? 0), 0
-  )
+  const weekSess = weekSessions ?? []
+  const weeklyMinutes = weekSess.reduce((sum, s) => sum + (s.duration_minutes ?? 0), 0)
+  const weeklySessionCount = weekSess.length
 
   return (
     <div className="px-4 pt-5 pb-6 max-w-lg mx-auto space-y-4">
@@ -54,6 +54,7 @@ export default async function FocusPage() {
         userId={user.id}
         todaySessions={(todaySessions ?? []) as FocusSession[]}
         weeklyMinutes={weeklyMinutes}
+        weeklySessionCount={weeklySessionCount}
       />
     </div>
   )
