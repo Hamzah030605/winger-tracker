@@ -121,7 +121,7 @@ function getTypeMeta(value: SessionType) {
 }
 
 const WEEKLY_SESSION_GOAL = 5
-const DAILY_SESSION_MIN   = 1
+const DAILY_SESSION_MIN   = 5
 
 // ─── Component ────────────────────────────────────────────────────────────────
 interface Props {
@@ -632,30 +632,35 @@ export function PomodoroTimer({ userId, todaySessions: initSessions, weeklyMinut
             </div>
 
             {/* Daily minimum */}
-            <div
-              className="flex items-center justify-between rounded-xl px-3 py-2.5"
-              style={{
-                background: todayDone ? 'rgba(16,185,129,0.08)' : 'rgba(239,68,68,0.06)',
-                border: `1px solid ${todayDone ? 'rgba(16,185,129,0.25)' : 'rgba(239,68,68,0.2)'}`,
-              }}
-            >
-              <div className="flex items-center gap-2">
-                <span className="text-base">{todayDone ? '✅' : '⏳'}</span>
-                <div>
-                  <p className="text-xs font-semibold" style={{ color: 'var(--foreground)' }}>
-                    Daily minimum
-                  </p>
-                  <p className="text-[10px]" style={{ color: 'var(--muted-foreground)' }}>
-                    {DAILY_SESSION_MIN} session per day
-                  </p>
-                </div>
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-[11px] font-bold uppercase tracking-[0.12em]" style={{ color: 'var(--muted-foreground)' }}>
+                  Daily minimum
+                </p>
+                <span
+                  className="text-[11px] font-bold"
+                  style={{ color: todayDone ? '#10b981' : todaySessions.length > 0 ? '#f59e0b' : '#ef4444' }}
+                >
+                  {todaySessions.length} / {DAILY_SESSION_MIN} today
+                  {todayDone && ' ✓'}
+                </span>
               </div>
-              <span
-                className="text-[11px] font-bold"
-                style={{ color: todayDone ? '#10b981' : '#ef4444' }}
-              >
-                {todayDone ? 'Done' : `${todaySessions.length}/${DAILY_SESSION_MIN}`}
-              </span>
+              <div className="flex gap-1.5">
+                {Array.from({ length: DAILY_SESSION_MIN }).map((_, i) => {
+                  const filled = i < todaySessions.length
+                  const dailyColor = todayDone ? '#10b981' : todaySessions.length > 0 ? '#f59e0b' : '#ef4444'
+                  return (
+                    <div
+                      key={i}
+                      className="flex-1 h-2.5 rounded-full transition-all"
+                      style={{
+                        background: filled ? dailyColor : 'var(--secondary)',
+                        border: filled ? 'none' : '1px solid var(--border)',
+                      }}
+                    />
+                  )
+                })}
+              </div>
             </div>
           </div>
         )
