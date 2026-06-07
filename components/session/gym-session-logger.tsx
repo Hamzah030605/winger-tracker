@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import type { GymSession, GymExercise } from '@/types/plans'
 import { createClient } from '@/lib/supabase/client'
@@ -9,6 +9,30 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
+
+// ─── Draft persistence (localStorage) ────────────────────────────────────────
+
+function draftKey(sessionId: string) {
+  return `gym-draft-${sessionId}`
+}
+
+function readDraft(sessionId: string): { logs: Record<string, ExerciseLog>; overallNotes: string } | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = localStorage.getItem(draftKey(sessionId))
+    if (!raw) return null
+    const d = JSON.parse(raw)
+    return d?.logs ? d : null
+  } catch { return null }
+}
+
+function writeDraft(sessionId: string, logs: Record<string, ExerciseLog>, overallNotes: string) {
+  try { localStorage.setItem(draftKey(sessionId), JSON.stringify({ logs, overallNotes })) } catch {}
+}
+
+function deleteDraft(sessionId: string) {
+  try { localStorage.removeItem(draftKey(sessionId)) } catch {}
+}
 
 interface ExerciseLog {
   done: boolean
@@ -35,27 +59,54 @@ export function GymSessionLogger({
   const router = useRouter()
   const allExercises = session.blocks.flatMap((b) => b.exercises)
 
-  const [logs, setLogs] = useState<Record<string, ExerciseLog>>(
-    Object.fromEntries(
-      allExercises.map((ex) => {
-        const prev = previousLogs[ex.name]
-        return [
-          ex.name,
-          {
-            done: false,
-            sets: prev?.sets != null ? String(prev.sets) : ex.sets,
-            reps: prev?.reps != null ? String(prev.reps) : ex.reps,
-            weight: prev?.weight != null ? String(prev.weight) : '',
-            rpe: prev?.rpe != null ? String(prev.rpe) : '',
-            notes: prev?.notes ?? '',
-          },
-        ]
-      })
-    )
+  // Build defaults from last completed session's exercise logs
+  const defaultLogs: Record<string, ExerciseLog> = Object.fromEntries(
+    allExercises.map((ex) => {
+      const prev = previousLogs[ex.name]
+      return [
+        ex.name,
+        {
+          done: false,
+          sets: prev?.sets != null ? String(prev.sets) : ex.sets,
+          reps: prev?.reps != null ? String(prev.reps) : ex.reps,
+          weight: prev?.weight != null ? String(prev.weight) : '',
+          rpe: prev?.rpe != null ? String(prev.rpe) : '',
+          notes: prev?.notes ?? '',
+        },
+      ]
+    })
   )
-  const [overallNotes, setOverallNotes] = useState('')
+
+  // Initialise from a saved draft if one exists, otherwise use defaults
+  const [logs, setLogs] = useState<Record<string, ExerciseLog>>(() => {
+    const d = readDraft(session.id)
+    return d?.logs ?? defaultLogs
+  })
+  const [overallNotes, setOverallNotes] = useState(() => {
+    const d = readDraft(session.id)
+    return d?.overallNotes ?? ''
+  })
+
   const [saving, setSaving] = useState(false)
   const [expandedEx, setExpandedEx] = useState<string | null>(null)
+  const [draftStatus, setDraftStatus] = useState<'idle' | 'loaded' | 'saved'>('idle')
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isFirstRender = useRef(true)
+
+  // Mark whether a draft was restored (runs after hydration so window is available)
+  useEffect(() => {
+    if (readDraft(session.id)) setDraftStatus('loaded')
+  }, [session.id])
+
+  // Autosave 800 ms after any field change (skip the very first render)
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return }
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+    autoSaveTimer.current = setTimeout(() => {
+      writeDraft(session.id, logs, overallNotes)
+      setDraftStatus('saved')
+    }, 800)
+  }, [logs, overallNotes, session.id])
 
   const doneCount = Object.values(logs).filter((l) => l.done).length
   const totalCount = allExercises.length
@@ -132,9 +183,10 @@ export function GymSessionLogger({
             details: exErr.details,
             hint: exErr.hint,
           })
-          // Session was saved — do not throw, just log. Exercises are lost for this attempt.
         }
       }
+
+      deleteDraft(session.id)
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err)
       console.error('[gym-logger] save failed, enqueueing offline:', errMsg)
@@ -178,6 +230,13 @@ export function GymSessionLogger({
             {doneCount}/{totalCount}
           </span>
         </div>
+
+        {/* Draft status */}
+        {draftStatus !== 'idle' && (
+          <p className="text-[10px] mt-1.5" style={{ color: 'var(--muted-foreground)' }}>
+            {draftStatus === 'loaded' ? '📂 Weights restored from your last draft' : '💾 Draft saved'}
+          </p>
+        )}
       </div>
 
       {/* Exercises by block */}
@@ -231,7 +290,7 @@ export function GymSessionLogger({
         <Textarea
           placeholder="How did it feel? PRs hit? What to improve next time…"
           value={overallNotes}
-          onChange={(e) => setOverallNotes(e.target.value)}
+          onChange={(e) => { setOverallNotes(e.target.value) }}
           className="min-h-[90px] text-sm"
           style={{ background: 'var(--input)', border: '1px solid var(--border)', color: 'var(--foreground)' }}
         />
