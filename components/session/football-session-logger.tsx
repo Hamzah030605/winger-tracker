@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import type { FootballSession, FootballDrill } from '@/types/plans'
 import { createClient } from '@/lib/supabase/client'
@@ -8,6 +8,30 @@ import { enqueueSession } from '@/lib/offline-queue'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
+
+// ─── Draft persistence (localStorage) ────────────────────────────────────────
+
+function draftKey(sessionId: string) {
+  return `football-draft-${sessionId}`
+}
+
+function readDraft(sessionId: string): { logs: Record<string, DrillLog>; overallNotes: string } | null {
+  if (typeof window === 'undefined') return null
+  try {
+    const raw = localStorage.getItem(draftKey(sessionId))
+    if (!raw) return null
+    const d = JSON.parse(raw)
+    return d?.logs ? d : null
+  } catch { return null }
+}
+
+function writeDraft(sessionId: string, logs: Record<string, DrillLog>, overallNotes: string) {
+  try { localStorage.setItem(draftKey(sessionId), JSON.stringify({ logs, overallNotes })) } catch {}
+}
+
+function deleteDraft(sessionId: string) {
+  try { localStorage.removeItem(draftKey(sessionId)) } catch {}
+}
 
 interface DrillLog {
   done: boolean
@@ -41,26 +65,48 @@ export function FootballSessionLogger({
   const router = useRouter()
   const allDrills = session.blocks.flatMap((b) => b.drills)
 
-  const [logs, setLogs] = useState<Record<string, DrillLog>>(
-    Object.fromEntries(
-      allDrills.map((d) => {
-        const prev = previousLogs[d.name]
-        return [
-          d.id,
-          {
-            done: false,
-            qualityRating: prev?.qualityRating ?? 0,
-            confidenceRating: prev?.confidenceRating ?? 0,
-            weakFootNotes: prev?.weakFootNotes ?? '',
-            notes: prev?.notes ?? '',
-          },
-        ]
-      })
-    )
+  const defaultLogs: Record<string, DrillLog> = Object.fromEntries(
+    allDrills.map((d) => {
+      const prev = previousLogs[d.name]
+      return [
+        d.id,
+        {
+          done: false,
+          qualityRating: prev?.qualityRating ?? 0,
+          confidenceRating: prev?.confidenceRating ?? 0,
+          weakFootNotes: prev?.weakFootNotes ?? '',
+          notes: prev?.notes ?? '',
+        },
+      ]
+    })
   )
-  const [overallNotes, setOverallNotes] = useState('')
+
+  const [logs, setLogs] = useState<Record<string, DrillLog>>(() => {
+    const d = readDraft(session.id)
+    return d?.logs ?? defaultLogs
+  })
+  const [overallNotes, setOverallNotes] = useState(() => {
+    const d = readDraft(session.id)
+    return d?.overallNotes ?? ''
+  })
   const [saving, setSaving] = useState(false)
   const [expandedDrill, setExpandedDrill] = useState<string | null>(null)
+  const [draftStatus, setDraftStatus] = useState<'idle' | 'loaded' | 'saved'>('idle')
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const isFirstRender = useRef(true)
+
+  useEffect(() => {
+    if (readDraft(session.id)) setDraftStatus('loaded')
+  }, [session.id])
+
+  useEffect(() => {
+    if (isFirstRender.current) { isFirstRender.current = false; return }
+    if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
+    autoSaveTimer.current = setTimeout(() => {
+      writeDraft(session.id, logs, overallNotes)
+      setDraftStatus('saved')
+    }, 800)
+  }, [logs, overallNotes, session.id])
 
   const doneCount = Object.values(logs).filter((l) => l.done).length
 
@@ -135,6 +181,8 @@ export function FootballSessionLogger({
           })
         }
       }
+
+      deleteDraft(session.id)
     } catch (err) {
       const errMsg = err instanceof Error ? err.message : String(err)
       console.error('[football-logger] save failed, enqueueing offline:', errMsg)
@@ -179,6 +227,13 @@ export function FootballSessionLogger({
             {doneCount}/{allDrills.length}
           </span>
         </div>
+
+        {/* Draft status */}
+        {draftStatus !== 'idle' && (
+          <p className="text-[10px] mt-1.5" style={{ color: 'var(--muted-foreground)' }}>
+            {draftStatus === 'loaded' ? '📂 Ratings restored from your last draft' : '💾 Draft saved'}
+          </p>
+        )}
       </div>
 
       {/* Drills by block */}
