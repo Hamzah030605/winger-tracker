@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { NotesClient } from '@/components/notes/notes-client'
+import type { NoteTask } from '@/types/database'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,6 +26,21 @@ export default async function NotesPage() {
     supabase.from('profiles').select('plan_start_date').eq('user_id', user.id).maybeSingle(),
   ])
 
+  // Roll incomplete tasks forward from the most recent past note when today has no note yet
+  let rolledOverTasks: NoteTask[] = []
+  if (!existing && pastRows && pastRows.length > 0) {
+    const recentTasks = (pastRows[0].tasks as NoteTask[] | null) ?? []
+    rolledOverTasks = recentTasks
+      .filter(t => !t.done)
+      .map(t => ({
+        id: Math.random().toString(36).slice(2, 10),
+        text: t.text,
+        done: false,
+        priority: t.priority,
+        rolledOver: true,
+      }))
+  }
+
   return (
     <div className="px-4 pt-6 pb-24 max-w-lg mx-auto space-y-3">
       <div className="flex items-baseline gap-2">
@@ -42,6 +58,7 @@ export default async function NotesPage() {
         pastNotes={pastRows ?? []}
         topicRows={topicRows ?? []}
         planStartDate={profile?.plan_start_date ?? today}
+        rolledOverTasks={rolledOverTasks}
       />
     </div>
   )

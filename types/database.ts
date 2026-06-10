@@ -400,4 +400,4 @@ export type InsertFocusSession = Database['public']['Tables']['focus_sessions'][
 export type WeeklyReview = Database['public']['Tables']['weekly_reviews']['Row']
 
 export type DailyNote = Database['public']['Tables']['daily_notes']['Row']
-export type NoteTask = { id: string; text: string; done: boolean; priority?: boolean }
+export type NoteTask = { id: string; text: string; done: boolean; priority?: boolean; rolledOver?: boolean }
