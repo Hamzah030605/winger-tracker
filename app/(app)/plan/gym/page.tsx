@@ -19,9 +19,23 @@ export default async function GymPlanPage() {
   // Show week 1 as minimum so the plan always renders usefully
   const currentWeek = Math.max(calculateCurrentWeek(planStartDate), 1)
 
+  const { data: logs } = await supabase
+    .from('session_logs')
+    .select('session_name, completed_at')
+    .eq('user_id', user.id)
+    .eq('plan_type', 'gym')
+    .order('completed_at', { ascending: false })
+
+  const lastCompleted: Record<string, string> = {}
+  for (const row of logs ?? []) {
+    if (row.session_name && !lastCompleted[row.session_name]) {
+      lastCompleted[row.session_name] = row.completed_at
+    }
+  }
+
   return (
     <div className="max-w-lg mx-auto">
-      <GymPlanView plan={GYM_PLAN} currentWeek={currentWeek} />
+      <GymPlanView plan={GYM_PLAN} currentWeek={currentWeek} lastCompleted={lastCompleted} />
     </div>
   )
 }

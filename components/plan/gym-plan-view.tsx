@@ -5,7 +5,7 @@ import Link from 'next/link'
 import type { GymPlan, GymSession } from '@/types/plans'
 import { Badge } from '@/components/ui/badge'
 
-export function GymPlanView({ plan, currentWeek }: { plan: GymPlan; currentWeek: number }) {
+export function GymPlanView({ plan, currentWeek, lastCompleted = {} }: { plan: GymPlan; currentWeek: number; lastCompleted?: Record<string, string> }) {
   const [expandedSession, setExpandedSession] = useState<string | null>(null)
   const [expandedPhase, setExpandedPhase] = useState<string | null>('1-2')
 
@@ -56,6 +56,7 @@ export function GymPlanView({ plan, currentWeek }: { plan: GymPlan; currentWeek:
               key={session.id}
               session={session}
               currentWeek={currentWeek}
+              lastCompletedAt={lastCompleted[session.name] ?? null}
               isOpen={expandedSession === session.id}
               onToggle={() => setExpandedSession(expandedSession === session.id ? null : session.id)}
             />
@@ -113,14 +114,21 @@ export function GymPlanView({ plan, currentWeek }: { plan: GymPlan; currentWeek:
   )
 }
 
+function formatLastDone(iso: string): string {
+  const d = new Date(iso)
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+}
+
 function SessionAccordion({
   session,
   currentWeek,
+  lastCompletedAt,
   isOpen,
   onToggle,
 }: {
   session: GymSession
   currentWeek: number
+  lastCompletedAt: string | null
   isOpen: boolean
   onToggle: () => void
 }) {
@@ -137,9 +145,19 @@ function SessionAccordion({
         style={{ minHeight: '64px' }}
       >
         <div>
-          <p className="text-xs font-semibold uppercase tracking-widest mb-0.5" style={{ color: 'var(--gym-accent)' }}>
-            {session.day}
-          </p>
+          <div className="flex items-center gap-2 mb-0.5">
+            <p className="text-xs font-semibold uppercase tracking-widest" style={{ color: 'var(--gym-accent)' }}>
+              {session.day}
+            </p>
+            {lastCompletedAt && (
+              <span
+                className="text-[10px] font-semibold px-1.5 py-0.5 rounded-full"
+                style={{ background: 'rgba(245,158,11,0.15)', color: 'var(--gym-accent)' }}
+              >
+                ✓ {formatLastDone(lastCompletedAt)}
+              </span>
+            )}
+          </div>
           <p className="font-bold" style={{ color: 'var(--foreground)' }}>{session.name}</p>
           <p className="text-xs mt-0.5" style={{ color: 'var(--muted-foreground)' }}>
             {totalExercises} exercises{session.hasSAQ ? ' + 20min SAQ' : ''}
